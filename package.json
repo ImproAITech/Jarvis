@@ -1,167 +1,194 @@
 {
-  "name": "rolldown",
-  "version": "1.2.9",
-  "description": "Fast JavaScript/TypeScript bundler in Rust with Rollup-compatible API.",
+  "name": "vite",
+  "version": "8.3.0",
+  "description": "Native-ESM powered web dev build tool",
   "keywords": [
-    "bundler",
-    "esbuild",
-    "parcel",
-    "rolldown",
-    "rollup",
-    "webpack"
+    "build-tool",
+    "dev-server",
+    "framework",
+    "frontend",
+    "hmr",
+    "vite"
   ],
-  "homepage": "https://rolldown.rs/",
+  "homepage": "https://vite.dev",
   "bugs": {
-    "url": "https://github.com/rolldown/rolldown/issues"
+    "url": "https://github.com/vitejs/vite/issues"
   },
   "license": "MIT",
+  "author": "Evan You",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rolldown/rolldown.git",
-    "directory": "packages/rolldown"
+    "url": "git+https://github.com/vitejs/vite.git",
+    "directory": "packages/vite"
   },
+  "funding": "https://github.com/vitejs/vite?sponsor=1",
   "bin": {
-    "rolldown": "./bin/cli.mjs"
+    "vite": "bin/vite.js"
   },
   "files": [
     "bin",
-    "cli",
     "dist",
-    "LICENSE",
-    "THIRD-PARTY-LICENSE",
-    "!dist/*.node"
+    "misc/**/*.js",
+    "client.d.ts",
+    "types"
   ],
   "type": "module",
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
   "imports": {
-    "#default-runtime": "./dist/experimental-default-runtime.mjs",
-    "#runtime": "./dist/experimental-runtime.mjs",
-    "#parallel-plugin-worker": "./dist/parallel-plugin-worker.mjs"
+    "#module-sync-enabled": {
+      "module-sync": "./misc/true.js",
+      "default": "./misc/false.js"
+    },
+    "#types/*": "./types/*.d.ts",
+    "#dep-types/*": "./src/types/*.d.ts"
   },
   "exports": {
-    ".": "./dist/index.mjs",
-    "./config": "./dist/config.mjs",
-    "./experimental": "./dist/experimental-index.mjs",
-    "./experimental/runtime-types": {
-      "types": "./dist/experimental-runtime-types.d.ts"
+    ".": "./dist/node/index.js",
+    "./client": {
+      "types": "./client.d.ts"
     },
-    "./experimental/runtime": {
-      "types": "./dist/experimental-runtime.d.ts",
-      "default": "./dist/experimental-runtime.mjs"
+    "./module-runner": "./dist/node/module-runner.js",
+    "./internal": "./dist/node/internal.js",
+    "./dist/client/*": "./dist/client/*",
+    "./types/*": {
+      "types": "./types/*"
     },
-    "./filter": "./dist/filter-index.mjs",
-    "./getLogFilter": "./dist/get-log-filter.mjs",
-    "./parallelPlugin": "./dist/parallel-plugin.mjs",
-    "./parseAst": "./dist/parse-ast-index.mjs",
-    "./package.json": "./package.json",
-    "./plugins": "./dist/plugins-index.mjs",
-    "./utils": "./dist/utils-index.mjs"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
+    "./types/internal/*": null,
+    "./package.json": "./package.json"
   },
   "dependencies": {
-    "@oxc-project/types": "=0.150.0",
-    "@rolldown/pluginutils": "^1.0.0"
+    "lightningcss": "^1.33.0",
+    "picomatch": "^4.0.7",
+    "postcss": "^8.5.28",
+    "rolldown": "~1.2.6",
+    "tinyglobby": "^0.2.17"
   },
   "devDependencies": {
-    "@emnapi/core": "2.0.0-alpha.5",
-    "@emnapi/runtime": "2.0.0-alpha.5",
-    "@napi-rs/cli": "^3.10.0",
-    "@napi-rs/wasm-runtime": "~1.2.2",
-    "@oxc-node/cli": "^0.1.0",
+    "@babel/parser": "^7.29.8",
+    "@jridgewell/remapping": "^2.3.5",
+    "@jridgewell/trace-mapping": "^0.3.31",
+    "@polka/compression": "^1.0.0-next.25",
+    "@rollup/plugin-alias": "^6.0.0",
+    "@rollup/plugin-dynamic-import-vars": "2.1.4",
+    "@rollup/pluginutils": "^5.4.0",
+    "@types/escape-html": "^1.0.4",
+    "@types/pnpapi": "^0.0.5",
+    "@vercel/detect-agent": "^1.2.5",
+    "@vitejs/devtools": "^0.7.1",
+    "@vitest/utils": "4.1.11",
+    "@voidzero-dev/vite-task-client": "^0.2.0",
+    "artichokie": "^0.4.4",
+    "baseline-browser-mapping": "^2.11.21",
     "cac": "^7.0.0",
-    "consola": "^3.4.2",
-    "emnapi": "2.0.0-alpha.5",
-    "execa": "^9.2.0",
+    "chokidar": "^3.6.0",
+    "connect": "^3.7.0",
+    "convert-source-map": "^2.0.0",
+    "cors": "^2.8.6",
+    "cross-spawn": "^7.0.6",
+    "dotenv-expand": "^13.0.0",
+    "es-module-lexer": "^2.3.2",
+    "esbuild": "^0.28.2",
+    "escape-html": "^1.0.3",
+    "estree-walker": "^3.0.3",
+    "etag": "^1.8.1",
     "fresh-import": "^0.2.1",
-    "glob": "^13.0.0",
-    "oxc-parser": "=0.150.0",
+    "host-validation-middleware": "^0.1.4",
+    "http-proxy-3": "^1.23.3",
+    "launch-editor-middleware": "^2.14.1",
+    "magic-string": "^1.2.3",
+    "mlly": "^1.8.2",
+    "mrmime": "^2.0.1",
+    "nanoid": "^5.1.16",
+    "obug": "^1.0.2",
+    "open": "^10.2.0",
+    "parse5": "^8.0.1",
     "pathe": "^2.0.3",
-    "remeda": "^2.48.0",
-    "rolldown": "1.2.9",
-    "rolldown-plugin-dts": "^0.28.0",
-    "rollup": "^4.63.0",
-    "signal-exit": "4.1.0",
-    "source-map": "0.8.0",
-    "typescript": "^6.0.0",
-    "valibot": "1.5.0"
+    "periscopic": "^4.0.3",
+    "picocolors": "^1.1.1",
+    "postcss-import": "^16.2.0",
+    "postcss-load-config": "^6.0.1",
+    "postcss-modules": "^9.0.1",
+    "premove": "^4.0.0",
+    "resolve.exports": "^2.0.3",
+    "rolldown-plugin-dts": "^0.28.3",
+    "rollup": "^4.59.0",
+    "rollup-plugin-license": "^3.7.1",
+    "sass": "^1.104.0",
+    "sass-embedded": "^1.104.0",
+    "sirv": "^3.0.2",
+    "strip-literal": "^4.0.0",
+    "terser": "^5.51.2",
+    "ufo": "^1.6.4",
+    "ws": "^8.21.3"
   },
-  "napi": {
-    "binaryName": "rolldown-binding",
-    "dtsHeader": "type MaybePromise<T> = T | Promise<T>\ntype Nullable<T> = T | null | undefined\ntype VoidNullable<T = void> = T | null | undefined | void\nexport type BindingStringOrRegex = string | RegExp\nexport type BindingResult<T> = { errors: BindingError[], isBindingErrors: boolean } | T\n\n",
-    "packageName": "@rolldown/binding",
-    "targets": [
-      "aarch64-apple-darwin",
-      "aarch64-linux-android",
-      "aarch64-pc-windows-msvc",
-      "aarch64-unknown-linux-gnu",
-      "aarch64-unknown-linux-musl",
-      "aarch64-unknown-linux-ohos",
-      "armv7-linux-androideabi",
-      "armv7-unknown-linux-gnueabihf",
-      "powerpc64le-unknown-linux-gnu",
-      "s390x-unknown-linux-gnu",
-      "wasm32-wasip1-threads",
-      "x86_64-apple-darwin",
-      "x86_64-pc-windows-msvc",
-      "x86_64-unknown-freebsd",
-      "x86_64-unknown-linux-gnu",
-      "x86_64-unknown-linux-musl"
-    ],
-    "wasm": {
-      "initialMemory": 16384,
-      "browser": {
-        "fs": true,
-        "asyncInit": true,
-        "errorEvent": true
-      }
+  "peerDependencies": {
+    "@types/node": "^20.19.0 || >=22.12.0",
+    "@vitejs/devtools": "^0.7.1",
+    "esbuild": "^0.27.0 || ^0.28.0",
+    "jiti": ">=1.21.0",
+    "less": "^4.0.0",
+    "sass": "^1.70.0",
+    "sass-embedded": "^1.70.0",
+    "stylus": ">=0.54.8",
+    "sugarss": "^5.0.0",
+    "terser": "^5.16.0",
+    "tsx": "^4.8.1",
+    "yaml": "^2.4.2"
+  },
+  "peerDependenciesMeta": {
+    "@types/node": {
+      "optional": true
+    },
+    "@vitejs/devtools": {
+      "optional": true
+    },
+    "esbuild": {
+      "optional": true
+    },
+    "jiti": {
+      "optional": true
+    },
+    "sass": {
+      "optional": true
+    },
+    "sass-embedded": {
+      "optional": true
+    },
+    "stylus": {
+      "optional": true
+    },
+    "less": {
+      "optional": true
+    },
+    "sugarss": {
+      "optional": true
+    },
+    "terser": {
+      "optional": true
+    },
+    "tsx": {
+      "optional": true
+    },
+    "yaml": {
+      "optional": true
     }
+  },
+  "optionalDependencies": {
+    "fsevents": "~2.3.3"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
   },
-  "optionalDependencies": {
-    "@rolldown/binding-darwin-arm64": "1.2.9",
-    "@rolldown/binding-android-arm64": "1.2.9",
-    "@rolldown/binding-win32-arm64-msvc": "1.2.9",
-    "@rolldown/binding-linux-arm64-gnu": "1.2.9",
-    "@rolldown/binding-linux-arm64-musl": "1.2.9",
-    "@rolldown/binding-openharmony-arm64": "1.2.9",
-    "@rolldown/binding-android-arm-eabi": "1.2.9",
-    "@rolldown/binding-linux-arm-gnueabihf": "1.2.9",
-    "@rolldown/binding-linux-ppc64-gnu": "1.2.9",
-    "@rolldown/binding-linux-s390x-gnu": "1.2.9",
-    "@rolldown/binding-darwin-x64": "1.2.9",
-    "@rolldown/binding-win32-x64-msvc": "1.2.9",
-    "@rolldown/binding-freebsd-x64": "1.2.9",
-    "@rolldown/binding-linux-x64-gnu": "1.2.9",
-    "@rolldown/binding-linux-x64-musl": "1.2.9"
-  },
+  "//": "READ CONTRIBUTING.md to understand what to put under deps vs. devDeps!",
   "scripts": {
-    "# Scrips for binding #": "_",
-    "artifacts": "napi artifacts --cwd ./src --package-json-path ../package.json -o=../artifacts --npm-dir ../npm",
-    "build-binding": "oxnode ./build-binding.ts",
-    "build-binding:release": "pnpm build-binding --release",
-    "build-binding:profile": "pnpm build-binding --profile profile --features chrome-tracing",
-    "build-binding:wasi": "pnpm build-binding --target wasm32-wasip1-threads",
-    "build-binding:wasi:release": "pnpm build-binding --profile release-wasi --target wasm32-wasip1-threads",
-    "# Scrips for node #": "_",
-    "build-node": "node --enable-source-maps --import @oxc-node/core/register -C dev ./build.ts",
-    "build-types-check": "tsc -p ./tsconfig.check.json",
-    "build-js-glue": "pnpm run --sequential '/^build-(node|types-check)$/'",
-    "build-native:debug": "pnpm run --sequential '/^build-(binding|js-glue)$/'",
-    "build-native:release": "pnpm run --sequential '/^build-(binding:release|js-glue)$/'",
-    "build-native:profile": "pnpm run build-binding:profile && pnpm run build-js-glue",
-    "build-native:memory-profile": "pnpm run build-binding:profile --features default_global_allocator && pnpm run build-js-glue",
-    "build-wasi:debug": "TARGET='rolldown-wasi' pnpm run --sequential '/^build-(binding|binding:wasi|node)$/'",
-    "build-wasi:release": "TARGET='rolldown-wasi' pnpm run --sequential '/^build-(binding|binding:wasi:release|node)$/'",
-    "build-browser-pkg:debug": "TARGET='browser' pnpm run --sequential '/^build-(binding:wasi|node)$/'",
-    "build-browser-pkg:release": "TARGET='browser' pnpm run --sequential '/^build-(binding:wasi:release|node)$/'",
-    "# Scrips for docs #": "_",
-    "publint": "publint ."
+    "dev": "premove dist && pnpm build-bundle -w",
+    "build": "premove dist && pnpm build-bundle && pnpm build-types",
+    "build-bundle": "rolldown --config rolldown.config.ts",
+    "build-types": "pnpm build-types-roll && pnpm build-types-check",
+    "build-types-roll": "rolldown --config rolldown.dts.config.ts",
+    "build-types-check": "tsc --project tsconfig.check.json",
+    "typecheck": "tsc && tsc -p src/node && tsc -p src/client && tsc -p src/module-runner && tsc -p src/shared && tsc -p src/node/__tests_dts__ && tsc -p src/module-runner/__tests_dts__",
+    "lint": "eslint --cache --ext .ts src/**",
+    "format": "oxfmt",
+    "generate-target": "tsx scripts/generateTarget.ts"
   }
 }
