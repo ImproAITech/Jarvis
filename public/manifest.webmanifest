@@ -1,0 +1,25 @@
+{
+  "name": "Jarvis — Asistente Personal",
+  "short_name": "Jarvis",
+  "description": "Tu asistente personal con IA para gestión de Calendario y Finanzas Personales",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070B12",
+  "theme_color": "#070B12",
+  "lang": "es-MX",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
