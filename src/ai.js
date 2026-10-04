@@ -423,11 +423,12 @@ async function callGemini(userInput, apiKey) {
     }
   ];
 
-  // Force tool use when user message clearly contains an action intent
-  const ACTION_RX = /\b(gast[eé]|pagu[eé]|compr[eé]|registr[a-z]+|anot[a-z]+|agrega|ingres[ao]|gano|gan[eé]|recib[ií]|pon(?:me)?|agend[a-z]+|cre[a-z]+\s+evento)\b/i;
-  const forceTool = ACTION_RX.test(userInput);
+  // Force tool use ONLY when message has clear action intent WITH an amount or object.
+  // Avoid triggering on short clarification replies like "1", "Comida", "la segunda", etc.
+  const ACTION_RX = /\b(gast[eé]|pagu[eé]|compr[eé]|registr[a-z]+|anot[a-z]+|agrega(?:r)?|gano|gan[eé]|recib[ií])\b.*\d|\d.*\b(gast[eé]|pagu[eé]|compr[eé]|registr[a-z]+|ingres[ao])\b/i;
+  const forceTool = ACTION_RX.test(userInput) && userInput.trim().length > 8;
 
-  const payload = {
+  const buildPayload = (mode) => ({
     contents,
     systemInstruction: {
       parts: [{ text: getSystemInstruction() }]
@@ -436,8 +437,7 @@ async function callGemini(userInput, apiKey) {
       { functionDeclarations: geminiToolDeclarations }
     ],
     toolConfig: {
-      // Use ANY to force a tool call when action intent is detected; otherwise AUTO
-      functionCallingConfig: { mode: forceTool ? 'ANY' : 'AUTO' }
+      functionCallingConfig: { mode }
     },
     generationConfig: {
       // thinkingBudget: 0 makes Gemini 2.5 Flash respond in ~1-1.5s without multi-second internal chain-of-thought
@@ -447,24 +447,31 @@ async function callGemini(userInput, apiKey) {
       maxOutputTokens: 600,
       temperature: 0.2
     }
-  };
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
   });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const errorMsg = errorData.error?.message || `Error en Gemini API (${response.status})`;
-    throw new Error(errorMsg);
+  // Helper to call the API and parse the result
+  async function fetchGemini(mode) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildPayload(mode))
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      const errorMsg = errorData.error?.message || `Error en Gemini API (${res.status})`;
+      throw new Error(errorMsg);
+    }
+    return res.json();
   }
 
-  const data = await response.json();
-  const candidate = data.candidates?.[0];
-  const content = candidate?.content;
-  const parts = content?.parts || [];
+  let data = await fetchGemini(forceTool ? 'ANY' : 'AUTO');
+  let parts = data.candidates?.[0]?.content?.parts || [];
+
+  // If ANY mode returned empty parts, retry with AUTO (Gemini couldn't pick a tool)
+  if (forceTool && parts.length === 0) {
+    data = await fetchGemini('AUTO');
+    parts = data.candidates?.[0]?.content?.parts || [];
+  }
 
   // Check for function calls
   const functionCallPart = parts.find(p => p.functionCall);
