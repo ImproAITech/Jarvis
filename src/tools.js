@@ -152,25 +152,52 @@ export const financeTools = {
       return { success: false, message: 'Monto inválido. Debe ser un número mayor a 0.' };
     }
 
+    const txType = type === 'income' ? 'income' : 'expense';
+    const isIncome = txType === 'income';
+    const availableCats = isIncome
+      ? store.getIncomeCategories()
+      : store.getExpenseCategories();
+
+    // Try case-insensitive exact match first, then partial match
+    const requestedCat = (category || '').trim();
+    let matchedCat = availableCats.find(c => c.toLowerCase() === requestedCat.toLowerCase());
+    if (!matchedCat && requestedCat) {
+      matchedCat = availableCats.find(c =>
+        c.toLowerCase().includes(requestedCat.toLowerCase()) ||
+        requestedCat.toLowerCase().includes(c.toLowerCase())
+      );
+    }
+
+    // If category not found in user's list, request clarification
+    if (!matchedCat) {
+      const listStr = availableCats.map((c, i) => `${i + 1}. ${c}`).join('\n');
+      const typeLabel = isIncome ? 'ingreso' : 'gasto';
+      return {
+        success: false,
+        needsClarification: true,
+        availableCategories: availableCats,
+        summary: `No encontré la categoría "${requestedCat}" en tus categorías de ${typeLabel}. ¿A cuál de estas la asigno?\n\n${listStr}\n\nResponde con el número o el nombre de la categoría.`
+      };
+    }
+
     const txDate = date ? parseToLocalDate(date).toISOString() : new Date().toISOString();
-    const finalCategory = (category || (type === 'income' ? 'Ingresos / Sueldo' : 'Otros')).trim();
 
     const created = store.addTransaction({
-      type,
+      type: txType,
       amount: numericAmount,
-      category: finalCategory,
-      description: description || finalCategory,
+      category: matchedCat,
+      description: description || matchedCat,
       date: txDate
     });
 
     const curr = store.getSettings().currency || 'MXN';
-    const typeLabel = type === 'income' ? 'Ingreso' : 'Gasto';
-    const icon = type === 'income' ? '🟢' : '🔴';
+    const typeLabel = isIncome ? 'Ingreso' : 'Gasto';
+    const icon = isIncome ? '🟢' : '🔴';
 
     return {
       success: true,
       transaction: created,
-      summary: `${icon} Registrado: ${typeLabel} de ${formatCurrency(numericAmount, curr)} en ${finalCategory} (${created.description}).`
+      summary: `${icon} Registrado: ${typeLabel} de ${formatCurrency(numericAmount, curr)} en ${matchedCat} (${created.description}).`
     };
   },
 

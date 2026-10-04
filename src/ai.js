@@ -61,9 +61,10 @@ REGLAS PARA FINANZAS:
 - Categorías de gasto configuradas por el usuario: ${expenseCats}.
 - Categorías de ingreso configuradas por el usuario: ${incomeCats}.
 - Al registrar un movimiento con 'add_transaction':
-  1. Si coincide con una de las categorías del usuario, úsala.
-  2. Si el usuario menciona una categoría propia o nueva (ej. "en gimnasio", "en ropa", "en mascotas"), usa exactamente el nombre que indicó el usuario (capitalizado). El sistema la registrará y guardará automáticamente.
-  3. Extrae siempre el monto numérico y la descripción. Moneda por defecto: MXN.
+  1. SOLO usa categorías de la lista del usuario. Nunca inventes o crees una nueva categoría.
+  2. Si el usuario menciona algo que encaja parcialmente con una categoría (ej. "tacos" -> "Comida / Alimentación"), mápalo a la más cercana.
+  3. Si no puedes deducir la categoría correcta de la lista, llama igual al tool con el nombre que dijo el usuario y el sistema preguntará al usuario cuál usar.
+  4. Extrae siempre el monto numérico y la descripción. Moneda por defecto: MXN.
 
 REGLAS DE VELOCIDAD Y RESPUESTA:
 - Sé conciso, breve y directo. El usuario te lee en la pantalla de su iPhone.`;
@@ -472,6 +473,14 @@ async function callGemini(userInput, apiKey) {
     const { name, args } = functionCallPart.functionCall;
     const toolOutput = executeTool(name, args);
 
+    // If tool needs clarification (e.g. unknown category), return as plain text question
+    if (toolOutput.needsClarification) {
+      return {
+        text: toolOutput.summary,
+        toolCall: null
+      };
+    }
+
     // Return immediately with tool summary to save an extra API call (50% quota savings and 2x faster)
     return {
       text: toolOutput.summary || 'Acción completada con éxito.',
@@ -531,6 +540,14 @@ async function callOpenAI(userInput, apiKey) {
     const name = toolCall.function.name;
     const args = JSON.parse(toolCall.function.arguments || '{}');
     const toolOutput = executeTool(name, args);
+
+    // If tool needs clarification (e.g. unknown category), return as plain text question
+    if (toolOutput.needsClarification) {
+      return {
+        text: toolOutput.summary,
+        toolCall: null
+      };
+    }
 
     return {
       text: toolOutput.summary || 'Acción completada con éxito.',

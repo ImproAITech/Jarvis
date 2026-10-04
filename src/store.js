@@ -230,11 +230,8 @@ class Store {
     const rawCat = (tx.category || (tx.type === 'income' ? 'Ingresos / Sueldo' : 'Otros')).trim();
     const isExpense = tx.type !== 'income';
 
-    if (isExpense) {
-      this.ensureExpenseCategory(rawCat);
-    } else {
-      this.ensureIncomeCategory(rawCat);
-    }
+    // NOTE: Categories are validated upstream in tools.js before addTransaction is called.
+    // We no longer auto-create categories here to keep the category list clean.
 
     const newTx = {
       id: tx.id || `tx-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
