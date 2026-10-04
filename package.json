@@ -1,0 +1,19 @@
+{
+  "name": "jarvis",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "@upstash/qstash": "^2.12.0",
+    "@upstash/redis": "^1.39.0",
+    "web-push": "^3.6.7"
+  }
+}

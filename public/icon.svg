@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+      <stop offset="0%" stop-color="#141B2D" />
+      <stop offset="60%" stop-color="#090D16" />
+      <stop offset="100%" stop-color="#030508" />
+    </radialGradient>
+    <linearGradient id="cyanViolet" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F0FF" />
+      <stop offset="50%" stop-color="#7000FF" />
+      <stop offset="100%" stop-color="#FF007A" />
+    </linearGradient>
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="40%">
+      <stop offset="0%" stop-color="#00F0FF" stop-opacity="1" />
+      <stop offset="30%" stop-color="#0080FF" stop-opacity="0.8" />
+      <stop offset="70%" stop-color="#7000FF" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#7000FF" stop-opacity="0" />
+    </radialGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Base background (iOS rounded square compatible) -->
+  <rect width="512" height="512" rx="115" fill="url(#bgGrad)" />
+  
+  <!-- Subtle border -->
+  <rect width="508" height="508" x="2" y="2" rx="113" fill="none" stroke="url(#cyanViolet)" stroke-width="2.5" stroke-opacity="0.4" />
+
+  <!-- Outer orbital ring with ticks -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#00F0FF" stroke-width="2" stroke-opacity="0.2" stroke-dasharray="8 14" />
+  
+  <!-- Middle tech ring segments -->
+  <circle cx="256" cy="256" r="145" fill="none" stroke="url(#cyanViolet)" stroke-width="5" stroke-linecap="round" stroke-dasharray="140 50 80 40" filter="url(#glow)" />
+  <circle cx="256" cy="256" r="130" fill="none" stroke="#00F0FF" stroke-width="2" stroke-opacity="0.5" stroke-dasharray="20 40 60 20" />
+
+  <!-- Radial Core Glow -->
+  <circle cx="256" cy="256" r="110" fill="url(#coreGlow)" filter="url(#glow)" />
+
+  <!-- Inner Arc Reactor Ring -->
+  <circle cx="256" cy="256" r="75" fill="none" stroke="#00F0FF" stroke-width="4" stroke-opacity="0.9" />
+  
+  <!-- Jarvis Tech Crosshairs & Nodes -->
+  <circle cx="256" cy="256" r="45" fill="#0A1124" stroke="#00F0FF" stroke-width="3" filter="url(#glow)" />
+  <circle cx="256" cy="256" r="18" fill="#FFFFFF" filter="url(#glow)" />
+
+  <!-- Cardinal Tick Marks -->
+  <line x1="256" y1="56" x2="256" y2="82" stroke="#00F0FF" stroke-width="3.5" stroke-linecap="round" />
+  <line x1="256" y1="430" x2="256" y2="456" stroke="#00F0FF" stroke-width="3.5" stroke-linecap="round" />
+  <line x1="56" y1="256" x2="82" y2="256" stroke="#00F0FF" stroke-width="3.5" stroke-linecap="round" />
+  <line x1="430" y1="256" x2="456" y2="256" stroke="#00F0FF" stroke-width="3.5" stroke-linecap="round" />
+
+  <!-- Corner indicators -->
+  <polygon points="120,120 135,120 120,135" fill="#00F0FF" opacity="0.7" />
+  <polygon points="392,120 377,120 392,135" fill="#00F0FF" opacity="0.7" />
+  <polygon points="120,392 135,392 120,377" fill="#00F0FF" opacity="0.7" />
+  <polygon points="392,392 377,392 392,377" fill="#00F0FF" opacity="0.7" />
+</svg>
