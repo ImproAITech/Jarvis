@@ -399,11 +399,20 @@ async function callGemini(userInput, apiKey) {
   const model = settings.geminiModel || 'gemini-2.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
 
-  // Keep last 4 messages (2 conversation turns) to save tokens and quota
-  const chatHistory = store.getChatHistory().slice(-4).map(msg => ({
-    role: msg.sender === 'user' ? 'user' : 'model',
-    parts: [{ text: msg.text }]
-  }));
+  // Keep last 6 messages (3 conversation turns) to save tokens and quota.
+  // IMPORTANT: Neutralize tool-call confirmation texts in model history so Gemini doesn't
+  // think it already executed the action for a new user request.
+  const TOOL_CONFIRM_RX = /^(?:🟢|🔴|💰|📅|✅)\s*Registrado:|^Registrado:|^Acción completada|^Evento creado/i;
+  const chatHistory = store.getChatHistory().slice(-6).map(msg => {
+    if (msg.sender !== 'user') {
+      const isToolConfirm = TOOL_CONFIRM_RX.test(msg.text.trim());
+      return {
+        role: 'model',
+        parts: [{ text: isToolConfirm ? 'Acción completada.' : msg.text }]
+      };
+    }
+    return { role: 'user', parts: [{ text: msg.text }] };
+  });
 
   const contents = [
     ...chatHistory,
@@ -412,6 +421,10 @@ async function callGemini(userInput, apiKey) {
       parts: [{ text: userInput }]
     }
   ];
+
+  // Force tool use when user message clearly contains an action intent
+  const ACTION_RX = /\b(gast[eé]|pagu[eé]|compr[eé]|registr[a-z]+|anot[a-z]+|agrega|ingres[ao]|gano|gan[eé]|recib[ií]|pon(?:me)?|agend[a-z]+|cre[a-z]+\s+evento)\b/i;
+  const forceTool = ACTION_RX.test(userInput);
 
   const payload = {
     contents,
@@ -422,7 +435,8 @@ async function callGemini(userInput, apiKey) {
       { functionDeclarations: geminiToolDeclarations }
     ],
     toolConfig: {
-      functionCallingConfig: { mode: 'AUTO' }
+      // Use ANY to force a tool call when action intent is detected; otherwise AUTO
+      functionCallingConfig: { mode: forceTool ? 'ANY' : 'AUTO' }
     },
     generationConfig: {
       // thinkingBudget: 0 makes Gemini 2.5 Flash respond in ~1-1.5s without multi-second internal chain-of-thought
