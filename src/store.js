@@ -5,11 +5,13 @@ const STORAGE_KEYS = {
   TRANSACTIONS: 'jarvis_finance_transactions',
   CHAT_HISTORY: 'jarvis_chat_history',
   SETTINGS: 'jarvis_user_settings',
-  BUDGETS: 'jarvis_category_budgets'
+  BUDGETS: 'jarvis_category_budgets',
+  EXPENSE_CATEGORIES: 'jarvis_expense_categories',
+  INCOME_CATEGORIES: 'jarvis_income_categories'
 };
 
-// Default expense categories shared across the app
-export const EXPENSE_CATEGORIES = [
+// Default categories shared across the app
+export const DEFAULT_EXPENSE_CATEGORIES = [
   'Comida / Alimentación',
   'Transporte',
   'Servicios',
@@ -17,6 +19,16 @@ export const EXPENSE_CATEGORIES = [
   'Salud',
   'Otros'
 ];
+
+export const DEFAULT_INCOME_CATEGORIES = [
+  'Ingresos / Sueldo',
+  'Inversiones',
+  'Ventas',
+  'Premios / Regalos',
+  'Otros'
+];
+
+export const EXPENSE_CATEGORIES = DEFAULT_EXPENSE_CATEGORIES;
 
 // Default seed data for initial rich experience
 const getInitialEvents = () => {
@@ -215,11 +227,20 @@ class Store {
 
   addTransaction(tx) {
     const transactions = this.getTransactions();
+    const rawCat = (tx.category || (tx.type === 'income' ? 'Ingresos / Sueldo' : 'Otros')).trim();
+    const isExpense = tx.type !== 'income';
+
+    if (isExpense) {
+      this.ensureExpenseCategory(rawCat);
+    } else {
+      this.ensureIncomeCategory(rawCat);
+    }
+
     const newTx = {
       id: tx.id || `tx-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      type: tx.type === 'income' ? 'income' : 'expense',
+      type: isExpense ? 'expense' : 'income',
       amount: Number(tx.amount) || 0,
-      category: tx.category || (tx.type === 'income' ? 'Ingresos' : 'Varios'),
+      category: rawCat,
       description: tx.description || 'Sin descripción',
       date: tx.date || new Date().toISOString()
     };
@@ -323,12 +344,107 @@ class Store {
     return budgets;
   }
 
+  // --- CATEGORIES MANAGEMENT ---
+  getExpenseCategories() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEYS.EXPENSE_CATEGORIES) || 'null');
+      if (Array.isArray(stored) && stored.length > 0) {
+        return stored;
+      }
+    } catch {}
+    return [...DEFAULT_EXPENSE_CATEGORIES];
+  }
+
+  saveExpenseCategories(categories) {
+    const clean = Array.from(new Set(categories.map(c => String(c).trim()).filter(Boolean)));
+    localStorage.setItem(STORAGE_KEYS.EXPENSE_CATEGORIES, JSON.stringify(clean));
+    this.notify('expense_categories', clean);
+    return clean;
+  }
+
+  addExpenseCategory(name) {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) return this.getExpenseCategories();
+    const current = this.getExpenseCategories();
+    if (!current.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      current.push(trimmed);
+      return this.saveExpenseCategories(current);
+    }
+    return current;
+  }
+
+  ensureExpenseCategory(name) {
+    return this.addExpenseCategory(name);
+  }
+
+  deleteExpenseCategory(name) {
+    const trimmed = String(name || '').trim().toLowerCase();
+    const current = this.getExpenseCategories();
+    const filtered = current.filter(c => c.toLowerCase() !== trimmed);
+    this.saveExpenseCategories(filtered);
+
+    // Also remove budget limit for this category if existed
+    const budgets = this.getBudgets();
+    let changed = false;
+    for (const key of Object.keys(budgets)) {
+      if (key.toLowerCase() === trimmed) {
+        delete budgets[key];
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.saveBudgets(budgets);
+    }
+    return filtered;
+  }
+
+  getIncomeCategories() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEYS.INCOME_CATEGORIES) || 'null');
+      if (Array.isArray(stored) && stored.length > 0) {
+        return stored;
+      }
+    } catch {}
+    return [...DEFAULT_INCOME_CATEGORIES];
+  }
+
+  saveIncomeCategories(categories) {
+    const clean = Array.from(new Set(categories.map(c => String(c).trim()).filter(Boolean)));
+    localStorage.setItem(STORAGE_KEYS.INCOME_CATEGORIES, JSON.stringify(clean));
+    this.notify('income_categories', clean);
+    return clean;
+  }
+
+  addIncomeCategory(name) {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) return this.getIncomeCategories();
+    const current = this.getIncomeCategories();
+    if (!current.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      current.push(trimmed);
+      return this.saveIncomeCategories(current);
+    }
+    return current;
+  }
+
+  ensureIncomeCategory(name) {
+    return this.addIncomeCategory(name);
+  }
+
+  deleteIncomeCategory(name) {
+    const trimmed = String(name || '').trim().toLowerCase();
+    const current = this.getIncomeCategories();
+    const filtered = current.filter(c => c.toLowerCase() !== trimmed);
+    return this.saveIncomeCategories(filtered);
+  }
+
   // Reset all to sample factory
   resetAllData() {
     localStorage.removeItem(STORAGE_KEYS.EVENTS);
     localStorage.removeItem(STORAGE_KEYS.TRANSACTIONS);
     localStorage.removeItem(STORAGE_KEYS.CHAT_HISTORY);
     localStorage.removeItem(STORAGE_KEYS.BUDGETS);
+    localStorage.removeItem(STORAGE_KEYS.EXPENSE_CATEGORIES);
+    localStorage.removeItem(STORAGE_KEYS.INCOME_CATEGORIES);
     this.init();
     this.notify('reset', null);
   }

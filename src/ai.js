@@ -28,6 +28,9 @@ export function getSystemInstruction() {
   const dayAfterStr = `${dayAfter.getFullYear()}-${pad(dayAfter.getMonth() + 1)}-${pad(dayAfter.getDate())}`;
   const dayAfterName = daysOfWeek[dayAfter.getDay()];
 
+  const expenseCats = store.getExpenseCategories().join(', ');
+  const incomeCats = store.getIncomeCategories().join(', ');
+
   return `Eres Jarvis, un asistente personal de IA integrado en un entorno móvil (iPhone).
 Tu objetivo es ayudar al usuario a gestionar su vida diaria con máxima rapidez, precisión y tono natural en español.
 Tienes acceso directo a herramientas para interactuar con su Calendario y su sistema de Finanzas Personales.
@@ -55,7 +58,12 @@ REGLAS CRÍTICAS PARA FECHAS Y CALENDARIO:
    - Si el usuario indica con cuánta anticipación quiere el aviso (ej. "avísame 30 minutos antes", "recuérdame 1 hora antes", "avísame 1 día antes", "avísame al comenzar"), calcula los minutos equivalentes (30, 60, 1440, 0) y pásalos en 'reminder_minutes'. Si no lo especifica, omite este parámetro.
 
 REGLAS PARA FINANZAS:
-- Extrae el monto numérico, tipo ('expense' para gasto, 'income' para ingreso) y categoría. Moneda por defecto: MXN.
+- Categorías de gasto configuradas por el usuario: ${expenseCats}.
+- Categorías de ingreso configuradas por el usuario: ${incomeCats}.
+- Al registrar un movimiento con 'add_transaction':
+  1. Si coincide con una de las categorías del usuario, úsala.
+  2. Si el usuario menciona una categoría propia o nueva (ej. "en gimnasio", "en ropa", "en mascotas"), usa exactamente el nombre que indicó el usuario (capitalizado). El sistema la registrará y guardará automáticamente.
+  3. Extrae siempre el monto numérico y la descripción. Moneda por defecto: MXN.
 
 REGLAS DE VELOCIDAD Y RESPUESTA:
 - Sé conciso, breve y directo. El usuario te lee en la pantalla de su iPhone.`;
@@ -76,19 +84,32 @@ function parseLocalIntent(userInput) {
     let rawDesc = (expenseMatch[2] || 'Varios').trim();
     rawDesc = rawDesc.replace(/\b(hace un rato|hoy|ayer|en la tarde)\b/gi, '').trim();
 
-    // Infer category
+    // Infer or match category
+    const userExpenseCats = store.getExpenseCategories();
     let category = 'Otros';
+    const textLower = text.toLowerCase();
     const descLower = rawDesc.toLowerCase();
-    if (/tacos|comida|cena|almuerzo|café|restaurante|pizza|hamburguesa|sushi|oxxo|desayuno/i.test(descLower)) {
-      category = 'Comida / Alimentación';
+
+    // Direct match with custom categories
+    const directMatch = userExpenseCats.find(c => {
+      const cl = c.toLowerCase();
+      return textLower.includes(cl) || descLower.includes(cl);
+    });
+
+    if (directMatch) {
+      category = directMatch;
+    } else if (/tacos|comida|cena|almuerzo|café|restaurante|pizza|hamburguesa|sushi|oxxo|desayuno/i.test(descLower)) {
+      category = userExpenseCats.find(c => /comida|aliment/i.test(c)) || 'Comida / Alimentación';
     } else if (/gasolina|gas|uber|didi|taxi|metro|pasaje|estacionamiento|peaje/i.test(descLower)) {
-      category = 'Transporte';
+      category = userExpenseCats.find(c => /transporte/i.test(c)) || 'Transporte';
     } else if (/luz|cfe|agua|internet|teléfono|renta|gas natural|netflix|spotify/i.test(descLower)) {
-      category = 'Servicios';
+      category = userExpenseCats.find(c => /servicio/i.test(c)) || 'Servicios';
     } else if (/cine|juego|salida|bar|cerveza|fiesta/i.test(descLower)) {
-      category = 'Entretenimiento';
+      category = userExpenseCats.find(c => /entretenimiento/i.test(c)) || 'Entretenimiento';
     } else if (/medicina|doctor|farmacia|consulta|dentista/i.test(descLower)) {
-      category = 'Salud';
+      category = userExpenseCats.find(c => /salud/i.test(c)) || 'Salud';
+    } else if (rawDesc && rawDesc !== 'Varios' && rawDesc.length <= 30) {
+      category = rawDesc.charAt(0).toUpperCase() + rawDesc.slice(1);
     }
 
     const toolResult = executeTool('add_transaction', {
@@ -116,10 +137,21 @@ function parseLocalIntent(userInput) {
   if (incomeMatch) {
     const amount = parseFloat(incomeMatch[1]);
     const rawDesc = (incomeMatch[2] || 'Ingreso general').trim();
+    const userIncomeCats = store.getIncomeCategories();
+    let category = userIncomeCats[0] || 'Ingresos / Sueldo';
+    const directIncomeMatch = userIncomeCats.find(c =>
+      text.toLowerCase().includes(c.toLowerCase()) || rawDesc.toLowerCase().includes(c.toLowerCase())
+    );
+    if (directIncomeMatch) {
+      category = directIncomeMatch;
+    } else if (rawDesc && rawDesc !== 'Ingreso general' && rawDesc.length <= 30 && !/sueldo|honorarios/i.test(rawDesc)) {
+      category = rawDesc.charAt(0).toUpperCase() + rawDesc.slice(1);
+    }
+
     const toolResult = executeTool('add_transaction', {
       type: 'income',
       amount,
-      category: 'Ingresos',
+      category,
       description: rawDesc,
       date: now.toISOString()
     });
@@ -127,10 +159,10 @@ function parseLocalIntent(userInput) {
       handled: true,
       toolResult: {
         name: 'add_transaction',
-        args: { type: 'income', amount, category: 'Ingresos', description: rawDesc },
+        args: { type: 'income', amount, category, description: rawDesc },
         result: toolResult
       },
-      response: `Registrado: Ingreso de $${amount} (${rawDesc}).`
+      response: `Registrado: Ingreso de $${amount} en ${category} (${rawDesc}).`
     };
   }
 

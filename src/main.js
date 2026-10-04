@@ -1,5 +1,5 @@
 import './style.css';
-import { store, EXPENSE_CATEGORIES } from './store.js';
+import { store } from './store.js';
 import { sendMessageToJarvis, testGeminiApiKey } from './ai.js';
 import { calendarTools, financeTools, formatCurrency, formatDateTime, parseToLocalDate } from './tools.js';
 import { voiceEngine } from './voice.js';
@@ -26,6 +26,7 @@ const ICONS = {
 class JarvisApp {
   constructor() {
     this.currentTab = 'chat';
+    this.activeCategoryTab = 'expense';
     this.selectedCalendarDate = new Date();
     this.isGenerating = false;
     this.initDOM();
@@ -51,8 +52,10 @@ class JarvisApp {
       if (topic === 'calendar' || topic === 'reset') {
         this.renderCalendar();
       }
-      if (topic === 'finance' || topic === 'budgets' || topic === 'reset') {
+      if (topic === 'finance' || topic === 'budgets' || topic === 'reset' || topic === 'expense_categories' || topic === 'income_categories') {
         this.renderFinances();
+        const txType = document.getElementById('txType')?.value || 'expense';
+        this.updateTxCategoryOptions(txType);
       }
       if (topic === 'settings' || topic === 'reset') {
         this.renderSettings();
@@ -518,15 +521,8 @@ class JarvisApp {
               </div>
               <div>
                 <label class="field-label" style="margin-bottom: 4px;">Categoría</label>
-                <select class="custom-select" id="txCategory">
-                  <option value="Comida / Alimentación">Comida / Alimentación</option>
-                  <option value="Transporte">Transporte / Gasolina</option>
-                  <option value="Servicios">Servicios / Facturas</option>
-                  <option value="Entretenimiento">Entretenimiento</option>
-                  <option value="Salud">Salud / Medicina</option>
-                  <option value="Ingresos / Sueldo">Ingresos / Sueldo</option>
-                  <option value="Otros">Otros</option>
-                </select>
+                <select class="custom-select" id="txCategory"></select>
+                <input type="text" id="txCategoryCustom" class="custom-input" placeholder="Nombre de la nueva categoría..." style="display:none; margin-top: 6px; font-size: 13px;" />
               </div>
             </div>
             <div>
@@ -756,6 +752,8 @@ class JarvisApp {
       const off = now.getTimezoneOffset();
       const local = new Date(now.getTime() - off * 60000);
       document.getElementById('txDate').value = local.toISOString().slice(0, 16);
+      const txType = document.getElementById('txType')?.value || 'expense';
+      this.updateTxCategoryOptions(txType);
       modalAddTx.classList.add('active');
     });
 
@@ -763,11 +761,36 @@ class JarvisApp {
       modalAddTx.classList.remove('active');
     });
 
+    document.getElementById('txType')?.addEventListener('change', (e) => {
+      this.updateTxCategoryOptions(e.target.value);
+    });
+
+    document.getElementById('txCategory')?.addEventListener('change', (e) => {
+      const customInput = document.getElementById('txCategoryCustom');
+      if (customInput) {
+        if (e.target.value === '__custom__') {
+          customInput.style.display = 'block';
+          customInput.focus();
+        } else {
+          customInput.style.display = 'none';
+          customInput.value = '';
+        }
+      }
+    });
+
     document.getElementById('formAddTx').addEventListener('submit', (e) => {
       e.preventDefault();
       const type = document.getElementById('txType').value;
       const amount = parseFloat(document.getElementById('txAmount').value);
-      const category = document.getElementById('txCategory').value;
+      let category = document.getElementById('txCategory').value;
+      if (category === '__custom__') {
+        const customVal = document.getElementById('txCategoryCustom')?.value?.trim();
+        if (!customVal) {
+          this.showToast('Ingresa el nombre de la nueva categoría');
+          return;
+        }
+        category = customVal;
+      }
       const description = document.getElementById('txDesc').value.trim();
       const dateVal = document.getElementById('txDate').value;
       const date = dateVal ? new Date(dateVal).toISOString() : new Date().toISOString();
@@ -1536,60 +1559,176 @@ class JarvisApp {
       }
     }
 
-    // Render Budget Limits Panel
+    // Render Budget Limits & Categories Panel
     const budgetCard = document.getElementById('budgetLimitsCard');
     if (budgetCard) {
       const budgets = store.getBudgets();
       const currency = store.getSettings().currency || 'MXN';
+      const expenseCats = store.getExpenseCategories();
+      const incomeCats = store.getIncomeCategories();
+      const isExpenseTab = this.activeCategoryTab !== 'income';
 
-      const budgetRows = EXPENSE_CATEGORIES.map(cat => {
-        const limit = budgets[cat] || 0;
-        const spent = catMap[cat] || 0;
-        const pct = limit > 0 ? Math.min(Math.round((spent / limit) * 100), 100) : 0;
-        const overLimit = limit > 0 && spent > limit;
-        const barColor = overLimit
-          ? 'var(--accent-rose)'
-          : pct >= 80
-          ? '#f59e0b'
-          : 'var(--accent-emerald)';
+      let contentHtml = `
+        <div class="category-tabs-bar">
+          <button type="button" class="cat-tab-btn ${isExpenseTab ? 'active' : ''}" id="catTabExpense">
+            🔴 Gastos y Presupuestos (${expenseCats.length})
+          </button>
+          <button type="button" class="cat-tab-btn ${!isExpenseTab ? 'active' : ''}" id="catTabIncome">
+            🟢 Categorías de Ingreso (${incomeCats.length})
+          </button>
+        </div>
+      `;
 
-        return `
-          <div class="budget-row" data-cat="${this.escapeHtml(cat)}">
-            <div class="budget-row-header">
-              <span class="budget-cat-name">${this.escapeHtml(cat)}</span>
-              <div class="budget-row-actions">
-                ${limit > 0 ? `
-                  <span class="budget-spent ${overLimit ? 'over' : ''}">
-                    ${formatCurrency(spent, currency)} / ${formatCurrency(limit, currency)}
-                    ${overLimit ? ' ⚠️' : ''}
-                  </span>
-                ` : '<span class="budget-no-limit">Sin límite</span>'}
-                <button class="budget-edit-btn" data-cat="${this.escapeHtml(cat)}" title="Editar límite">✏️</button>
-              </div>
+      if (isExpenseTab) {
+        contentHtml += `
+          <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px; line-height:1.4;">
+            Personaliza tus categorías y límites mensuales. Toca ✏️ para editar el límite o 🗑️ para quitar la categoría.
+          </p>
+        `;
+
+        if (expenseCats.length === 0) {
+          contentHtml += `
+            <div style="text-align: center; padding: 18px; color: var(--text-muted); font-size: 13px;">
+              No tienes categorías de gasto activas.
             </div>
-            ${limit > 0 ? `
-              <div class="budget-bar-track">
-                <div class="budget-bar-fill" style="width:${pct}%; background:${barColor};"></div>
+          `;
+        } else {
+          contentHtml += expenseCats.map(cat => {
+            const limit = budgets[cat] || 0;
+            const spent = catMap[cat] || 0;
+            const pct = limit > 0 ? Math.min(Math.round((spent / limit) * 100), 100) : 0;
+            const overLimit = limit > 0 && spent > limit;
+            const barColor = overLimit
+              ? 'var(--accent-rose)'
+              : pct >= 80
+              ? '#f59e0b'
+              : 'var(--accent-emerald)';
+            const emoji = this.getCategoryEmoji(cat);
+            const safeCat = this.escapeHtml(cat);
+            const editId = 'budget-edit-' + safeCat.replace(/[^a-zA-Z0-9]/g, '-');
+
+            return `
+              <div class="budget-row" data-cat="${safeCat}">
+                <div class="budget-row-header">
+                  <div class="budget-cat-name">
+                    <span class="cat-emoji">${emoji}</span>
+                    <span>${safeCat}</span>
+                  </div>
+                  <div class="budget-row-actions">
+                    ${limit > 0 ? `
+                      <span class="budget-spent ${overLimit ? 'over' : ''}">
+                        ${formatCurrency(spent, currency)} / ${formatCurrency(limit, currency)}
+                        ${overLimit ? ' ⚠️' : ''}
+                      </span>
+                    ` : '<span class="budget-no-limit">Sin límite</span>'}
+                    <button type="button" class="budget-action-btn budget-edit-btn" data-cat="${safeCat}" title="Editar límite">✏️</button>
+                    <button type="button" class="budget-action-btn budget-delete-btn" data-cat="${safeCat}" data-type="expense" title="Eliminar categoría">🗑️</button>
+                  </div>
+                </div>
+                ${limit > 0 ? `
+                  <div class="budget-bar-track">
+                    <div class="budget-bar-fill" style="width:${pct}%; background:${barColor};"></div>
+                  </div>
+                ` : ''}
+                <div class="budget-edit-row" id="${editId}" style="display:none;">
+                  <label class="field-label" style="font-size:11px; margin-bottom:4px;">Límite mensual para "${safeCat}":</label>
+                  <input type="number" class="custom-input budget-limit-input" placeholder="Límite en ${currency} ($)" step="50" min="0" value="${limit > 0 ? limit : ''}" />
+                  <div style="display:flex; gap:6px; margin-top:8px;">
+                    <button type="button" class="btn-primary budget-save-btn" style="flex:1; font-size:12px; padding:7px;">Guardar límite</button>
+                    ${limit > 0 ? `<button type="button" class="btn-secondary budget-remove-btn" style="flex:1; font-size:12px; padding:7px;">Quitar límite</button>` : ''}
+                  </div>
+                </div>
               </div>
-            ` : ''}
-            <div class="budget-edit-row" id="budget-edit-${this.escapeHtml(cat).replace(/[^a-zA-Z0-9]/g,'-')}" style="display:none;">
-              <input type="number" class="custom-input budget-limit-input" placeholder="Límite mensual ($)" step="50" min="0" value="${limit > 0 ? limit : ''}" />
-              <div style="display:flex; gap:6px; margin-top:6px;">
-                <button class="btn-primary budget-save-btn" style="flex:1; font-size:12px; padding:8px;">Guardar</button>
-                <button class="btn-secondary budget-remove-btn" style="flex:1; font-size:12px; padding:8px;">Quitar límite</button>
+            `;
+          }).join('');
+        }
+
+        // Add expense category button & inline panel
+        contentHtml += `
+          <div style="margin-top: 14px;">
+            <button type="button" class="btn-add-cat" id="btnToggleAddExpenseCat">
+              <span>➕</span> Nueva Categoría de Gasto
+            </button>
+            <div class="new-cat-panel" id="panelAddExpenseCat" style="display:none;">
+              <div class="new-cat-panel-title">Crear nueva categoría de gasto</div>
+              <input type="text" id="inputNewExpenseCatName" class="custom-input" placeholder="Nombre (ej. Gimnasio, Mascotas, Ropa...)" style="margin-bottom:8px; font-size:13px;" />
+              <input type="number" id="inputNewExpenseCatLimit" class="custom-input" placeholder="Límite mensual opcional ($)" step="50" min="0" style="margin-bottom:10px; font-size:13px;" />
+              <div style="display:flex; gap:6px;">
+                <button type="button" class="btn-primary" id="btnConfirmAddExpenseCat" style="flex:1; font-size:12px; padding:8px;">Crear Categoría</button>
+                <button type="button" class="btn-secondary" id="btnCancelAddExpenseCat" style="flex:1; font-size:12px; padding:8px;">Cancelar</button>
               </div>
             </div>
           </div>
         `;
-      }).join('');
+      } else {
+        // Income Tab
+        contentHtml += `
+          <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px; line-height:1.4;">
+            Categorías para organizar tus fuentes de ingresos (sueldos, freelance, ventas, etc.).
+          </p>
+        `;
 
-      budgetCard.innerHTML = `
-        <div class="breakdown-title">Presupuesto mensual por categoría</div>
-        <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px; margin-top:-2px;">Toca ✏️ para establecer un límite. Te notificaremos si te pasas.</p>
-        ${budgetRows}
-      `;
+        if (incomeCats.length === 0) {
+          contentHtml += `
+            <div style="text-align: center; padding: 18px; color: var(--text-muted); font-size: 13px;">
+              No tienes categorías de ingreso activas.
+            </div>
+          `;
+        } else {
+          contentHtml += incomeCats.map(cat => {
+            const incomeAmt = monthTxs.filter(t => t.type === 'income' && t.category === cat).reduce((s, t) => s + t.amount, 0);
+            const safeCat = this.escapeHtml(cat);
 
-      // Wire edit buttons
+            return `
+              <div class="budget-row" data-cat="${safeCat}">
+                <div class="budget-row-header">
+                  <div class="budget-cat-name">
+                    <span class="cat-emoji">🟢</span>
+                    <span>${safeCat}</span>
+                  </div>
+                  <div class="budget-row-actions">
+                    <span class="budget-spent" style="color:var(--accent-emerald);">
+                      ${formatCurrency(incomeAmt, currency)}
+                    </span>
+                    <button type="button" class="budget-action-btn budget-delete-btn" data-cat="${safeCat}" data-type="income" title="Eliminar categoría">🗑️</button>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+
+        // Add income category button & inline panel
+        contentHtml += `
+          <div style="margin-top: 14px;">
+            <button type="button" class="btn-add-cat" id="btnToggleAddIncomeCat">
+              <span>➕</span> Nueva Categoría de Ingreso
+            </button>
+            <div class="new-cat-panel" id="panelAddIncomeCat" style="display:none;">
+              <div class="new-cat-panel-title">Crear nueva categoría de ingreso</div>
+              <input type="text" id="inputNewIncomeCatName" class="custom-input" placeholder="Nombre (ej. Freelance, Renta, Inversiones...)" style="margin-bottom:10px; font-size:13px;" />
+              <div style="display:flex; gap:6px;">
+                <button type="button" class="btn-primary" id="btnConfirmAddIncomeCat" style="flex:1; font-size:12px; padding:8px;">Crear Categoría</button>
+                <button type="button" class="btn-secondary" id="btnCancelAddIncomeCat" style="flex:1; font-size:12px; padding:8px;">Cancelar</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      budgetCard.innerHTML = contentHtml;
+
+      // Category tab switching listeners
+      document.getElementById('catTabExpense')?.addEventListener('click', () => {
+        this.activeCategoryTab = 'expense';
+        this.renderFinances();
+      });
+      document.getElementById('catTabIncome')?.addEventListener('click', () => {
+        this.activeCategoryTab = 'income';
+        this.renderFinances();
+      });
+
+      // Wire edit limit buttons
       budgetCard.querySelectorAll('.budget-edit-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const cat = btn.getAttribute('data-cat');
@@ -1597,14 +1736,16 @@ class JarvisApp {
           const editRow = document.getElementById(editId);
           if (editRow) {
             const isOpen = editRow.style.display !== 'none';
-            // Close all
             budgetCard.querySelectorAll('.budget-edit-row').forEach(r => r.style.display = 'none');
-            if (!isOpen) editRow.style.display = 'block';
+            if (!isOpen) {
+              editRow.style.display = 'block';
+              editRow.querySelector('.budget-limit-input')?.focus();
+            }
           }
         });
       });
 
-      // Wire save buttons
+      // Wire save limit buttons
       budgetCard.querySelectorAll('.budget-save-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const row = btn.closest('.budget-row');
@@ -1616,11 +1757,11 @@ class JarvisApp {
             return;
           }
           store.setBudget(cat, val);
-          this.showToast(`✅ Límite de ${formatCurrency(val, store.getSettings().currency || 'MXN')} guardado para ${cat}`);
+          this.showToast(`✅ Límite de ${formatCurrency(val, store.getSettings().currency || 'MXN')} guardado para "${cat}"`);
         });
       });
 
-      // Wire remove-limit buttons
+      // Wire remove limit buttons
       budgetCard.querySelectorAll('.budget-remove-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const row = btn.closest('.budget-row');
@@ -1628,6 +1769,68 @@ class JarvisApp {
           store.setBudget(cat, null);
           this.showToast(`Límite de "${cat}" eliminado`);
         });
+      });
+
+      // Wire delete category buttons
+      budgetCard.querySelectorAll('.budget-delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const cat = btn.getAttribute('data-cat');
+          const type = btn.getAttribute('data-type');
+          if (confirm(`¿Eliminar la categoría "${cat}"?`)) {
+            if (type === 'income') {
+              store.deleteIncomeCategory(cat);
+            } else {
+              store.deleteExpenseCategory(cat);
+            }
+            this.showToast(`Categoría "${cat}" eliminada`);
+          }
+        });
+      });
+
+      // Toggle Add Expense Category Panel
+      const btnToggleAddExp = document.getElementById('btnToggleAddExpenseCat');
+      const panelAddExp = document.getElementById('panelAddExpenseCat');
+      btnToggleAddExp?.addEventListener('click', () => {
+        const isHidden = panelAddExp.style.display === 'none';
+        panelAddExp.style.display = isHidden ? 'block' : 'none';
+        if (isHidden) document.getElementById('inputNewExpenseCatName')?.focus();
+      });
+      document.getElementById('btnCancelAddExpenseCat')?.addEventListener('click', () => {
+        panelAddExp.style.display = 'none';
+      });
+      document.getElementById('btnConfirmAddExpenseCat')?.addEventListener('click', () => {
+        const name = document.getElementById('inputNewExpenseCatName')?.value?.trim();
+        const limitVal = parseFloat(document.getElementById('inputNewExpenseCatLimit')?.value);
+        if (!name) {
+          this.showToast('Ingresa el nombre de la categoría');
+          return;
+        }
+        store.addExpenseCategory(name);
+        if (!isNaN(limitVal) && limitVal > 0) {
+          store.setBudget(name, limitVal);
+        }
+        this.showToast(`✅ Categoría "${name}" creada`);
+      });
+
+      // Toggle Add Income Category Panel
+      const btnToggleAddInc = document.getElementById('btnToggleAddIncomeCat');
+      const panelAddInc = document.getElementById('panelAddIncomeCat');
+      btnToggleAddInc?.addEventListener('click', () => {
+        const isHidden = panelAddInc.style.display === 'none';
+        panelAddInc.style.display = isHidden ? 'block' : 'none';
+        if (isHidden) document.getElementById('inputNewIncomeCatName')?.focus();
+      });
+      document.getElementById('btnCancelAddIncomeCat')?.addEventListener('click', () => {
+        panelAddInc.style.display = 'none';
+      });
+      document.getElementById('btnConfirmAddIncomeCat')?.addEventListener('click', () => {
+        const name = document.getElementById('inputNewIncomeCatName')?.value?.trim();
+        if (!name) {
+          this.showToast('Ingresa el nombre de la categoría');
+          return;
+        }
+        store.addIncomeCategory(name);
+        this.showToast(`✅ Categoría de ingreso "${name}" creada`);
       });
     }
     const txList = document.getElementById('transactionsList');
@@ -1675,15 +1878,48 @@ class JarvisApp {
     }
   }
 
+  updateTxCategoryOptions(type = 'expense') {
+    const select = document.getElementById('txCategory');
+    const customInput = document.getElementById('txCategoryCustom');
+    if (!select) return;
+
+    if (customInput) {
+      customInput.style.display = 'none';
+      customInput.value = '';
+    }
+
+    const categories = type === 'income'
+      ? store.getIncomeCategories()
+      : store.getExpenseCategories();
+
+    let html = categories.map(cat => {
+      const emoji = type === 'income' ? '🟢' : this.getCategoryEmoji(cat);
+      return `<option value="${this.escapeHtml(cat)}">${emoji} ${this.escapeHtml(cat)}</option>`;
+    }).join('');
+
+    html += `<option value="__custom__">✨ + Nueva categoría personalizada...</option>`;
+    select.innerHTML = html;
+  }
+
   getCategoryEmoji(cat) {
     if (!cat) return '💳';
     const c = cat.toLowerCase();
-    if (c.includes('comida') || c.includes('alimento') || c.includes('taco')) return '🌮';
-    if (c.includes('transporte') || c.includes('gasolina') || c.includes('uber')) return '⛽';
-    if (c.includes('servicio') || c.includes('luz') || c.includes('agua')) return '⚡';
-    if (c.includes('entretenimiento') || c.includes('cine')) return '🍿';
-    if (c.includes('salud') || c.includes('medicina') || c.includes('doctor')) return '🩺';
-    if (c.includes('sueldo') || c.includes('ingreso')) return '💵';
+    if (c.includes('comida') || c.includes('alimento') || c.includes('taco') || c.includes('restaurante') || c.includes('café') || c.includes('pizza') || c.includes('super')) return '🌮';
+    if (c.includes('transporte') || c.includes('gasolina') || c.includes('uber') || c.includes('auto') || c.includes('didi') || c.includes('gas')) return '⛽';
+    if (c.includes('servicio') || c.includes('luz') || c.includes('agua') || c.includes('internet') || c.includes('renta')) return '⚡';
+    if (c.includes('entretenimiento') || c.includes('cine') || c.includes('juego') || c.includes('fiesta') || c.includes('salida') || c.includes('netflix')) return '🍿';
+    if (c.includes('salud') || c.includes('medicina') || c.includes('doctor') || c.includes('farmacia') || c.includes('dentista')) return '🩺';
+    if (c.includes('gimnasio') || c.includes('gym') || c.includes('deporte') || c.includes('fitness')) return '🏋️';
+    if (c.includes('ropa') || c.includes('moda') || c.includes('vestir') || c.includes('zapatos')) return '👕';
+    if (c.includes('educación') || c.includes('escuela') || c.includes('curso') || c.includes('libro')) return '📚';
+    if (c.includes('mascota') || c.includes('perro') || c.includes('gato') || c.includes('veterinario')) return '🐾';
+    if (c.includes('viaje') || c.includes('vuelo') || c.includes('hotel') || c.includes('vacaciones')) return '✈️';
+    if (c.includes('hogar') || c.includes('casa') || c.includes('mueble')) return '🏠';
+    if (c.includes('tecnología') || c.includes('gadget') || c.includes('computadora')) return '💻';
+    if (c.includes('sueldo') || c.includes('ingreso') || c.includes('salario') || c.includes('pago')) return '💵';
+    if (c.includes('inversión') || c.includes('ahorro') || c.includes('rendimiento')) return '📈';
+    if (c.includes('venta') || c.includes('comercio')) return '🏷️';
+    if (c.includes('regalo') || c.includes('premio')) return '🎁';
     return '🛍️';
   }
 

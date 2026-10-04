@@ -153,7 +153,7 @@ export const financeTools = {
     }
 
     const txDate = date ? parseToLocalDate(date).toISOString() : new Date().toISOString();
-    const finalCategory = category || (type === 'income' ? 'Ingresos' : 'Varios');
+    const finalCategory = (category || (type === 'income' ? 'Ingresos / Sueldo' : 'Otros')).trim();
 
     const created = store.addTransaction({
       type,
@@ -306,7 +306,7 @@ export const geminiToolDeclarations = [
       properties: {
         type: { type: 'STRING', enum: ['expense', 'income'], description: 'Tipo: expense para gasto, income para ingreso' },
         amount: { type: 'NUMBER', description: 'Monto numérico en la moneda local (ej. 150.50)' },
-        category: { type: 'STRING', description: 'Categoría (ej. Comida / Alimentación, Transporte, Servicios, Entretenimiento, Salud, Sueldo)' },
+        category: { type: 'STRING', description: 'Categoría del movimiento. Puede ser una de las existentes o cualquier categoría personalizada que el usuario indique (ej. Comida / Alimentación, Transporte, Servicios, Entretenimiento, Salud, Sueldo, Gimnasio, Mascotas, Ropa, etc.)' },
         description: { type: 'STRING', description: 'Concepto o detalle breve del movimiento (ej. Tacos, Gasolina, Uber, Netflix)' },
         date: { type: 'STRING', description: 'Fecha del movimiento en ISO 8601' }
       },
