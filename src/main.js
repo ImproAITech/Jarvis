@@ -49,7 +49,7 @@ class JarvisApp {
       if (topic === 'chat' || topic === 'chat_cleared') {
         this.renderChatMessages();
       }
-      if (topic === 'calendar' || topic === 'reset') {
+      if (topic === 'calendar' || topic === 'recurring_events' || topic === 'reset') {
         this.renderCalendar();
       }
       if (topic === 'finance' || topic === 'budgets' || topic === 'reset' || topic === 'expense_categories' || topic === 'income_categories') {
@@ -181,6 +181,21 @@ class JarvisApp {
 
           <!-- Events Timeline -->
           <div class="events-timeline" id="eventsTimeline"></div>
+
+          <!-- Eventos Programados -->
+          <div class="recurring-section">
+            <div class="recurring-section-header">
+              <div class="recurring-section-title">
+                <span class="recurring-icon">🔁</span>
+                <span>Eventos Programados</span>
+              </div>
+              <button class="icon-btn recurring-add-btn" id="btnOpenAddRecurring" title="Agregar evento programado">
+                ${ICONS.plus}
+              </button>
+            </div>
+            <p class="recurring-section-hint">Eventos automáticos por mes o por días de la semana (ej. todos los lunes y martes).</p>
+            <div id="recurringEventsList"></div>
+          </div>
         </section>
 
         <!-- 3. FINANCE TAB -->
@@ -256,7 +271,8 @@ class JarvisApp {
               <div id="geminiModelGroup">
                 <label class="field-label">Modelo Gemini</label>
                 <select class="custom-select" id="settingGeminiModel">
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recomendado)</option>
+                  <option value="gemini-3.8-flash">Gemini 3.8 Flash (Recomendado)</option>
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                   <option value="gemini-2.5-pro">Gemini 2.5 Pro (Máximo razonamiento)</option>
                   <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite (Ultra rápido)</option>
                 </select>
@@ -498,7 +514,124 @@ class JarvisApp {
         </div>
       </div>
 
-      <!-- MODAL: Add Transaction -->
+      <!-- MODAL: Add/Edit Recurring Event -->
+      <div class="modal-backdrop" id="modalAddRecurring">
+        <div class="modal-sheet">
+          <div class="sheet-handle"></div>
+          <div class="modal-header">
+            <h3 id="modalRecurringTitle" style="font-size: 17px; font-weight: 700;">Evento Programado</h3>
+            <button class="icon-btn" id="btnCloseAddRecurring">${ICONS.plus}</button>
+          </div>
+          <form id="formAddRecurring" style="display: flex; flex-direction: column; gap: 12px;">
+            <input type="hidden" id="recurringEditId" value="" />
+            <input type="hidden" id="recurringType" value="monthly_day" />
+            <div>
+              <label class="field-label" style="margin-bottom: 4px;">Título del Evento</label>
+              <input type="text" id="recurringTitle" class="custom-input" placeholder="Ej. Pago de Renta, Junta de Equipo..." required />
+            </div>
+
+            <!-- Recurrence Type Switcher -->
+            <div>
+              <label class="field-label" style="margin-bottom: 6px;">Frecuencia de Repetición</label>
+              <div class="recurrence-type-selector">
+                <button type="button" class="recurrence-type-btn active" data-type="monthly_day" id="btnRecTypeMonthly">
+                  📅 Día del mes
+                </button>
+                <button type="button" class="recurrence-type-btn" data-type="weekly_days" id="btnRecTypeWeekly">
+                  🔄 Días de la semana
+                </button>
+              </div>
+            </div>
+
+            <!-- Option 1: Monthly Day -->
+            <div id="recurringDayMonthlyGroup">
+              <label class="field-label" style="margin-bottom: 4px;">Día del Mes que se Repite</label>
+              <select class="custom-select" id="recurringDay">
+                ${Array.from({length: 31}, (_, i) => `<option value="${i+1}">${i+1}${i===0?' (primero del mes)':i===30?' (último si aplica)':''}</option>`).join('')}
+              </select>
+              <span class="field-hint" style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">Se repetirá automáticamente este mismo día en cada mes.</span>
+            </div>
+
+            <!-- Option 2: Days of the Week -->
+            <div id="recurringDayWeeklyGroup" style="display: none;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="field-label" style="margin-bottom: 0;">Selecciona los días</label>
+                <div class="recurring-quick-links">
+                  <button type="button" class="btn-text-sm" id="btnQuickWeekdays">Entre semana</button>
+                  <span class="dot-sep">·</span>
+                  <button type="button" class="btn-text-sm" id="btnQuickMonTue">Lunes y Martes</button>
+                  <span class="dot-sep">·</span>
+                  <button type="button" class="btn-text-sm" id="btnQuickAllDays">Todos</button>
+                </div>
+              </div>
+              <div class="weekday-pills" id="recurringWeekdayPills">
+                <button type="button" class="weekday-pill active" data-day="1">Lun</button>
+                <button type="button" class="weekday-pill" data-day="2">Mar</button>
+                <button type="button" class="weekday-pill" data-day="3">Mié</button>
+                <button type="button" class="weekday-pill" data-day="4">Jue</button>
+                <button type="button" class="weekday-pill" data-day="5">Vie</button>
+                <button type="button" class="weekday-pill" data-day="6">Sáb</button>
+                <button type="button" class="weekday-pill" data-day="0">Dom</button>
+              </div>
+              <div id="recurringWeekdaySummary" class="recurring-weekday-summary">
+                Todos los lunes
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div>
+                <label class="field-label" style="margin-bottom: 4px;">Hora de Inicio</label>
+                <input type="time" id="recurringStartTime" class="custom-input" value="09:00" required />
+              </div>
+              <div>
+                <label class="field-label" style="margin-bottom: 4px;">Duración</label>
+                <select class="custom-select" id="recurringDuration">
+                  <option value="30">30 minutos</option>
+                  <option value="60" selected>1 hora</option>
+                  <option value="90">1.5 horas</option>
+                  <option value="120">2 horas</option>
+                  <option value="180">3 horas</option>
+                  <option value="240">4 horas</option>
+                  <option value="480">Día completo</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="field-label" style="margin-bottom: 4px;">Color / Categoría</label>
+              <div class="recurring-color-picker" id="recurringColorPicker">
+                <button type="button" class="color-chip active" data-color="cyan" style="background: var(--accent-cyan);"></button>
+                <button type="button" class="color-chip" data-color="purple" style="background: var(--accent-purple);"></button>
+                <button type="button" class="color-chip" data-color="emerald" style="background: var(--accent-emerald);"></button>
+                <button type="button" class="color-chip" data-color="amber" style="background: #f59e0b;"></button>
+                <button type="button" class="color-chip" data-color="rose" style="background: #f43f5e;"></button>
+              </div>
+            </div>
+            <div>
+              <label class="field-label" style="margin-bottom: 4px;">Ubicación (opcional)</label>
+              <input type="text" id="recurringLocation" class="custom-input" placeholder="Ej. Oficina, Zoom..." />
+            </div>
+            <div>
+              <label class="field-label" style="margin-bottom: 4px;">Descripción (opcional)</label>
+              <input type="text" id="recurringDescription" class="custom-input" placeholder="Notas o detalles..." />
+            </div>
+            <div>
+              <label class="field-label" style="margin-bottom: 4px;">Recordatorio</label>
+              <select class="custom-select" id="recurringReminder">
+                <option value="default">Usar predeterminado de Ajustes</option>
+                <option value="5">5 minutos antes</option>
+                <option value="15">15 minutos antes</option>
+                <option value="30">30 minutos antes</option>
+                <option value="60">1 hora antes</option>
+                <option value="1440">1 día antes</option>
+                <option value="0">Al comenzar</option>
+                <option value="-1">Sin recordatorio</option>
+              </select>
+            </div>
+            <button type="submit" class="btn-primary" id="recurringSubmitBtn" style="margin-top: 6px;">Guardar Evento Programado</button>
+          </form>
+        </div>
+      </div>
+
       <div class="modal-backdrop" id="modalAddTx">
         <div class="modal-sheet">
           <div class="sheet-handle"></div>
@@ -757,6 +890,119 @@ class JarvisApp {
       modalAddTx.classList.add('active');
     });
 
+    // Recurring Events modal
+    const modalAddRecurring = document.getElementById('modalAddRecurring');
+
+    document.getElementById('btnOpenAddRecurring').addEventListener('click', () => {
+      this.openRecurringModal(null);
+    });
+
+    document.getElementById('btnCloseAddRecurring').addEventListener('click', () => {
+      modalAddRecurring.classList.remove('active');
+    });
+
+    // Frequency type switcher (monthly day vs weekdays)
+    document.getElementById('btnRecTypeMonthly')?.addEventListener('click', () => {
+      this.setRecurrenceType('monthly_day');
+    });
+
+    document.getElementById('btnRecTypeWeekly')?.addEventListener('click', () => {
+      this.setRecurrenceType('weekly_days');
+    });
+
+    // Weekday pills interactive toggle
+    document.getElementById('recurringWeekdayPills')?.addEventListener('click', (e) => {
+      const pill = e.target.closest('.weekday-pill');
+      if (!pill) return;
+      pill.classList.toggle('active');
+      // Keep at least one selected
+      const current = this.getSelectedWeekdays();
+      if (current.length === 0) {
+        pill.classList.add('active');
+      }
+      this.updateWeekdaySummary();
+    });
+
+    // Quick weekday preset buttons
+    document.getElementById('btnQuickWeekdays')?.addEventListener('click', () => {
+      this.setSelectedWeekdays([1, 2, 3, 4, 5]);
+    });
+
+    document.getElementById('btnQuickMonTue')?.addEventListener('click', () => {
+      this.setSelectedWeekdays([1, 2]);
+    });
+
+    document.getElementById('btnQuickAllDays')?.addEventListener('click', () => {
+      this.setSelectedWeekdays([0, 1, 2, 3, 4, 5, 6]);
+    });
+
+    // Color picker chips
+    document.getElementById('recurringColorPicker')?.addEventListener('click', (e) => {
+      const chip = e.target.closest('.color-chip');
+      if (!chip) return;
+      document.querySelectorAll('#recurringColorPicker .color-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    });
+
+    document.getElementById('formAddRecurring').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const editId = document.getElementById('recurringEditId').value;
+      const title = document.getElementById('recurringTitle').value.trim();
+      const recurrence_type = document.getElementById('recurringType').value || 'monthly_day';
+      const day_of_month = parseInt(document.getElementById('recurringDay').value, 10);
+      const days_of_week = this.getSelectedWeekdays();
+
+      if (recurrence_type === 'weekly_days' && days_of_week.length === 0) {
+        this.showToast('⚠️ Selecciona al menos un día de la semana');
+        return;
+      }
+
+      const timeVal = document.getElementById('recurringStartTime').value; // "HH:MM"
+      const [start_hour, start_minute] = timeVal.split(':').map(Number);
+      const duration_minutes = parseInt(document.getElementById('recurringDuration').value, 10);
+      const location = document.getElementById('recurringLocation').value.trim();
+      const description = document.getElementById('recurringDescription').value.trim();
+      const remVal = document.getElementById('recurringReminder').value;
+      const reminder_minutes = remVal === 'default' ? undefined : parseInt(remVal, 10);
+      const activeChip = document.querySelector('#recurringColorPicker .color-chip.active');
+      const color = activeChip?.getAttribute('data-color') || 'cyan';
+
+      const payload = {
+        title,
+        recurrence_type,
+        day_of_month,
+        days_of_week,
+        start_hour,
+        start_minute,
+        duration_minutes,
+        location,
+        description,
+        reminder_minutes,
+        color
+      };
+
+      if (editId) {
+        store.updateRecurringEvent(editId, payload);
+        this.showToast('✅ Evento programado actualizado');
+      } else {
+        store.addRecurringEvent(payload);
+        this.showToast('🔁 Evento programado con éxito');
+      }
+
+      modalAddRecurring.classList.remove('active');
+      e.target.reset();
+    });
+
+    // Close modals on backdrop click
+    [modalAddEvent, modalAddTx, modalAddRecurring].forEach(modal => {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.classList.remove('active');
+        }
+      });
+    });
+
+
     document.getElementById('btnCloseAddTx').addEventListener('click', () => {
       modalAddTx.classList.remove('active');
     });
@@ -842,14 +1088,6 @@ class JarvisApp {
       this.showToast('💰 Movimiento registrado');
     });
 
-    // Close modals on backdrop click
-    [modalAddEvent, modalAddTx].forEach(modal => {
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-          modal.classList.remove('active');
-        }
-      });
-    });
 
     // Settings Provider Toggle
     const settingProvider = document.getElementById('settingProvider');
@@ -881,7 +1119,7 @@ class JarvisApp {
 
     btnTestGeminiKey?.addEventListener('click', async () => {
       const key = geminiKeyInput.value.trim();
-      const model = document.getElementById('settingGeminiModel')?.value || 'gemini-2.5-flash';
+      const model = document.getElementById('settingGeminiModel')?.value || 'gemini-3.8-flash';
 
       if (!key) {
         if (geminiKeyStatus) geminiKeyStatus.innerHTML = '<span style="color: var(--accent-rose);">⚠️ Pega tu API Key primero.</span>';
@@ -935,7 +1173,7 @@ class JarvisApp {
     const btnSaveGeminiKeyNow = document.getElementById('btnSaveGeminiKeyNow');
     btnSaveGeminiKeyNow?.addEventListener('click', () => {
       const apiKey = document.getElementById('settingGeminiKey')?.value.trim();
-      const model = document.getElementById('settingGeminiModel')?.value || 'gemini-2.5-flash';
+      const model = document.getElementById('settingGeminiModel')?.value || 'gemini-3.8-flash';
       if (!apiKey) {
         const geminiKeyStatus = document.getElementById('geminiKeyStatus');
         if (geminiKeyStatus) geminiKeyStatus.innerHTML = '<span style="color: var(--accent-rose);">⚠️ Escribe o pega tu API Key primero.</span>';
@@ -1353,6 +1591,7 @@ class JarvisApp {
   renderCalendar() {
     this.renderDateStrip();
     this.renderEventsTimeline();
+    this.renderRecurringEventsList();
   }
 
   renderDateStrip() {
@@ -1396,14 +1635,56 @@ class JarvisApp {
     if (!container) return;
 
     const allEvents = store.getEvents();
-    const selDateStr = this.selectedCalendarDate.toDateString();
+    const allRecurring = store.getRecurringEvents();
+    const selDate = this.selectedCalendarDate;
+    const selDateStr = selDate.toDateString();
+    const selDay = selDate.getDate();
+    const selMonth = selDate.getMonth();
+    const selYear = selDate.getFullYear();
 
+    // Regular events for this day
     const filtered = allEvents.filter(e => {
       const d = parseToLocalDate(e.start_time);
       return d.toDateString() === selDateStr;
     });
 
-    if (filtered.length === 0) {
+    // Recurring events whose recurrence matches selected day
+    const daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
+    const selDayOfWeek = selDate.getDay(); // 0: Dom, 1: Lun, 2: Mar, 3: Mié, 4: Jue, 5: Vie, 6: Sáb
+
+    const recurringForDay = allRecurring.filter(r => {
+      if (r.recurrence_type === 'weekly_days') {
+        const days = Array.isArray(r.days_of_week) ? r.days_of_week : [];
+        return days.includes(selDayOfWeek);
+      }
+      const effectiveDay = Math.min(r.day_of_month || 1, daysInMonth);
+      return effectiveDay === selDay;
+    });
+
+    // Build combined event objects from recurring for display
+    const recurringAsEvents = recurringForDay.map(r => {
+      const startDate = new Date(selYear, selMonth, selDay, r.start_hour, r.start_minute, 0);
+      const endDate = new Date(startDate.getTime() + r.duration_minutes * 60000);
+      const badgeLabel = r.recurrence_type === 'weekly_days' ? 'Semanal' : 'Mensual';
+      return {
+        id: r.id,
+        title: r.title,
+        start_time: startDate.toISOString(),
+        end_time: endDate.toISOString(),
+        description: r.description,
+        location: r.location,
+        reminder_minutes: r.reminder_minutes,
+        color: r.color,
+        isRecurring: true,
+        recurrenceBadge: badgeLabel
+      };
+    });
+
+    const allForDay = [...filtered, ...recurringAsEvents].sort(
+      (a, b) => new Date(a.start_time) - new Date(b.start_time)
+    );
+
+    if (allForDay.length === 0) {
       container.innerHTML = `
         <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
           <div style="font-size: 36px; margin-bottom: 8px;">🗓️</div>
@@ -1417,7 +1698,15 @@ class JarvisApp {
     const settings = store.getSettings();
     const defaultRem = settings.defaultReminderMinutes !== undefined ? parseInt(settings.defaultReminderMinutes, 10) : 15;
 
-    container.innerHTML = filtered.map(evt => {
+    const COLOR_VARS = {
+      cyan: 'var(--accent-cyan)',
+      purple: 'var(--accent-purple)',
+      emerald: 'var(--accent-emerald)',
+      amber: '#f59e0b',
+      rose: '#f43f5e'
+    };
+
+    container.innerHTML = allForDay.map(evt => {
       const startTime = new Date(evt.start_time).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
       const endTime = evt.end_time ? new Date(evt.end_time).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : '';
       const rem = evt.reminder_minutes !== undefined && evt.reminder_minutes !== null ? evt.reminder_minutes : defaultRem;
@@ -1431,17 +1720,25 @@ class JarvisApp {
         reminderBadge = `<span class="event-reminder-badge" title="Alerta al comenzar">${ICONS.bell} Al iniciar</span>`;
       }
 
+      const accentColor = evt.isRecurring ? (COLOR_VARS[evt.color] || COLOR_VARS.cyan) : '';
+      const accentStyle = evt.isRecurring ? `border-left: 3px solid ${accentColor};` : '';
+      const recurringBadge = evt.isRecurring
+        ? `<span class="recurring-timeline-badge" style="color:${accentColor};">🔁 ${evt.recurrenceBadge || 'Programado'}</span>`
+        : '';
+
       return `
-        <div class="event-card">
+        <div class="event-card" style="${accentStyle}" ${evt.isRecurring ? `data-recurring-id="${evt.id}"` : ''}>
           <div class="event-card-header">
             <div class="event-card-title">${this.escapeHtml(evt.title)}</div>
-            <button class="event-delete-btn" data-id="${evt.id}" title="Eliminar evento">
-              ${ICONS.trash}
-            </button>
+            ${evt.isRecurring
+              ? `<button class="event-edit-recurring-btn" data-id="${evt.id}" title="Editar evento programado" style="color: ${accentColor};">${ICONS.check}</button>`
+              : `<button class="event-delete-btn" data-id="${evt.id}" title="Eliminar evento">${ICONS.trash}</button>`
+            }
           </div>
           <div class="event-card-time">
             <span>${ICONS.clock} ${startTime} ${endTime ? `— ${endTime}` : ''}</span>
             ${reminderBadge}
+            ${recurringBadge}
           </div>
           ${evt.description ? `<div class="event-card-desc">${this.escapeHtml(evt.description)}</div>` : ''}
           ${evt.location ? `
@@ -1453,7 +1750,7 @@ class JarvisApp {
       `;
     }).join('');
 
-    // Delete event handler
+    // Delete regular event handler
     container.querySelectorAll('.event-delete-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1462,9 +1759,254 @@ class JarvisApp {
         this.showToast('Evento eliminado');
       });
     });
+
+    // Edit recurring event from timeline (opens modal)
+    container.querySelectorAll('.event-edit-recurring-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        this.openRecurringModal(id);
+      });
+    });
   }
 
-  // --- FINANCES RENDERING ---
+  // Helper to format natural schedule text (e.g. "Todos los lunes y martes")
+  formatWeekdaySummary(days) {
+    if (!days || days.length === 0) return 'Selecciona al menos un día';
+    if (days.length === 7) return 'Todos los días de la semana';
+    if (days.length === 5 && [1, 2, 3, 4, 5].every(d => days.includes(d))) {
+      return 'Todos los días (lunes a viernes)';
+    }
+    if (days.length === 2 && days.includes(0) && days.includes(6)) {
+      return 'Todos los fines de semana (sábados y domingos)';
+    }
+
+    const dayNames = {
+      1: 'lunes',
+      2: 'martes',
+      3: 'miércoles',
+      4: 'jueves',
+      5: 'viernes',
+      6: 'sábados',
+      0: 'domingos'
+    };
+
+    // Sort with Monday first: 1..6, then 0 (Sunday)
+    const sorted = [...days].sort((a, b) => {
+      const aVal = a === 0 ? 7 : a;
+      const bVal = b === 0 ? 7 : b;
+      return aVal - bVal;
+    });
+
+    const names = sorted.map(d => dayNames[d]);
+    if (names.length === 1) {
+      return `Todos los ${names[0]}`;
+    }
+    const last = names.pop();
+    return `Todos los ${names.join(', ')} y ${last}`;
+  }
+
+  getRecurringScheduleText(r) {
+    if (r.recurrence_type === 'weekly_days') {
+      const days = Array.isArray(r.days_of_week) ? r.days_of_week : [1];
+      return this.formatWeekdaySummary(days);
+    }
+    return `Día ${r.day_of_month || 1} de cada mes`;
+  }
+
+  setRecurrenceType(type) {
+    const hidden = document.getElementById('recurringType');
+    if (hidden) hidden.value = type;
+
+    const btnMonthly = document.getElementById('btnRecTypeMonthly');
+    const btnWeekly = document.getElementById('btnRecTypeWeekly');
+    const groupMonthly = document.getElementById('recurringDayMonthlyGroup');
+    const groupWeekly = document.getElementById('recurringDayWeeklyGroup');
+
+    if (type === 'weekly_days') {
+      btnWeekly?.classList.add('active');
+      btnMonthly?.classList.remove('active');
+      if (groupMonthly) groupMonthly.style.display = 'none';
+      if (groupWeekly) groupWeekly.style.display = 'block';
+    } else {
+      btnMonthly?.classList.add('active');
+      btnWeekly?.classList.remove('active');
+      if (groupMonthly) groupMonthly.style.display = 'block';
+      if (groupWeekly) groupWeekly.style.display = 'none';
+    }
+  }
+
+  getSelectedWeekdays() {
+    const pills = document.querySelectorAll('#recurringWeekdayPills .weekday-pill.active');
+    return Array.from(pills).map(p => parseInt(p.getAttribute('data-day'), 10));
+  }
+
+  setSelectedWeekdays(days) {
+    const set = new Set(days);
+    document.querySelectorAll('#recurringWeekdayPills .weekday-pill').forEach(pill => {
+      const d = parseInt(pill.getAttribute('data-day'), 10);
+      if (set.has(d)) {
+        pill.classList.add('active');
+      } else {
+        pill.classList.remove('active');
+      }
+    });
+    this.updateWeekdaySummary();
+  }
+
+  updateWeekdaySummary() {
+    const summary = document.getElementById('recurringWeekdaySummary');
+    if (!summary) return;
+    const days = this.getSelectedWeekdays();
+    summary.textContent = this.formatWeekdaySummary(days);
+  }
+
+  // --- RECURRING EVENTS PANEL ---
+  renderRecurringEventsList() {
+    const container = document.getElementById('recurringEventsList');
+    if (!container) return;
+
+    const events = store.getRecurringEvents();
+
+    const COLOR_VARS = {
+      cyan: 'var(--accent-cyan)',
+      purple: 'var(--accent-purple)',
+      emerald: 'var(--accent-emerald)',
+      amber: '#f59e0b',
+      rose: '#f43f5e'
+    };
+
+    if (events.length === 0) {
+      container.innerHTML = `
+        <div class="recurring-empty">
+          <div style="font-size: 28px;">🗓️</div>
+          <div>Sin eventos programados aún.</div>
+          <div style="font-size: 11px; margin-top: 4px;">Toca «+» para agregar un evento que se repita cada mes o en días de la semana.</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = events.map(r => {
+      const color = COLOR_VARS[r.color] || COLOR_VARS.cyan;
+      const startH = String(r.start_hour).padStart(2, '0');
+      const startM = String(r.start_minute).padStart(2, '0');
+      const endDate = new Date(0, 0, 0, r.start_hour, r.start_minute + r.duration_minutes);
+      const endH = String(endDate.getHours()).padStart(2, '0');
+      const endMin = String(endDate.getMinutes()).padStart(2, '0');
+      let durLabel = r.duration_minutes >= 60
+        ? `${Math.floor(r.duration_minutes/60)}h${r.duration_minutes%60 ? ' '+r.duration_minutes%60+'m' : ''}`
+        : `${r.duration_minutes}m`;
+      const schedText = this.getRecurringScheduleText(r);
+
+      return `
+        <div class="recurring-card" style="border-left: 3px solid ${color};">
+          <div class="recurring-card-top">
+            <div class="recurring-card-dot" style="background: ${color};"></div>
+            <div class="recurring-card-info">
+              <div class="recurring-card-title">${this.escapeHtml(r.title)}</div>
+              <div class="recurring-card-meta">
+                <span class="recurring-meta-schedule">${schedText}</span>
+                <span class="dot-sep">·</span>
+                <span>${startH}:${startM} — ${endH}:${endMin} (${durLabel})</span>
+              </div>
+              ${r.description ? `<div class="recurring-card-desc">${this.escapeHtml(r.description)}</div>` : ''}
+              ${r.location ? `<div class="recurring-card-loc">${ICONS.pin} ${this.escapeHtml(r.location)}</div>` : ''}
+            </div>
+          </div>
+          <div class="recurring-card-actions">
+            <button class="recurring-edit-btn" data-id="${r.id}" title="Editar">
+              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              Editar
+            </button>
+            <button class="recurring-delete-btn" data-id="${r.id}" title="Eliminar evento programado">
+              ${ICONS.trash}
+              Eliminar
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Edit handlers
+    container.querySelectorAll('.recurring-edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.openRecurringModal(btn.getAttribute('data-id'));
+      });
+    });
+
+    // Delete handlers
+    container.querySelectorAll('.recurring-delete-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        if (confirm('¿Eliminar este evento programado? Se quitará de todos los días en los que se repite.')) {
+          store.deleteRecurringEvent(id);
+          this.showToast('Evento programado eliminado');
+        }
+      });
+    });
+  }
+
+  openRecurringModal(editId = null) {
+    const modal = document.getElementById('modalAddRecurring');
+    const titleEl = document.getElementById('modalRecurringTitle');
+    const editIdInput = document.getElementById('recurringEditId');
+    const submitBtn = document.getElementById('recurringSubmitBtn');
+
+    // Reset color picker
+    document.querySelectorAll('#recurringColorPicker .color-chip').forEach(c => c.classList.remove('active'));
+    document.querySelector('#recurringColorPicker .color-chip[data-color="cyan"]')?.classList.add('active');
+
+    if (editId) {
+      const evt = store.getRecurringEvents().find(r => r.id === editId);
+      if (!evt) return;
+      titleEl.textContent = 'Editar Evento Programado';
+      submitBtn.textContent = 'Guardar Cambios';
+      editIdInput.value = editId;
+      document.getElementById('recurringTitle').value = evt.title;
+
+      const recType = evt.recurrence_type || 'monthly_day';
+      this.setRecurrenceType(recType);
+
+      if (evt.day_of_month) {
+        document.getElementById('recurringDay').value = evt.day_of_month;
+      }
+      if (evt.days_of_week && evt.days_of_week.length > 0) {
+        this.setSelectedWeekdays(evt.days_of_week);
+      } else {
+        this.setSelectedWeekdays([1]);
+      }
+
+      const hh = String(evt.start_hour).padStart(2, '0');
+      const mm = String(evt.start_minute).padStart(2, '0');
+      document.getElementById('recurringStartTime').value = `${hh}:${mm}`;
+      document.getElementById('recurringDuration').value = evt.duration_minutes;
+      document.getElementById('recurringLocation').value = evt.location || '';
+      document.getElementById('recurringDescription').value = evt.description || '';
+      document.getElementById('recurringReminder').value =
+        evt.reminder_minutes !== undefined ? String(evt.reminder_minutes) : 'default';
+      // color
+      const chip = document.querySelector(`#recurringColorPicker .color-chip[data-color="${evt.color}"]`);
+      if (chip) {
+        document.querySelectorAll('#recurringColorPicker .color-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      }
+    } else {
+      titleEl.textContent = 'Nuevo Evento Programado';
+      submitBtn.textContent = 'Guardar Evento Programado';
+      editIdInput.value = '';
+      document.getElementById('formAddRecurring').reset();
+      this.setRecurrenceType('monthly_day');
+      this.setSelectedWeekdays([1]);
+      document.getElementById('recurringStartTime').value = '09:00';
+      document.getElementById('recurringDuration').value = '60';
+      document.querySelector('#recurringColorPicker .color-chip[data-color="cyan"]')?.classList.add('active');
+    }
+
+    modal.classList.add('active');
+  }
+
+
   renderFinances() {
     const transactions = store.getTransactions();
     const currency = store.getSettings().currency || 'MXN';
@@ -1934,7 +2476,7 @@ class JarvisApp {
     if (geminiInput) geminiInput.value = settings.apiKey || '';
 
     const modelSelect = document.getElementById('settingGeminiModel');
-    if (modelSelect) modelSelect.value = settings.geminiModel || 'gemini-2.5-flash';
+    if (modelSelect) modelSelect.value = settings.geminiModel || 'gemini-3.8-flash';
 
     const openaiInput = document.getElementById('settingOpenaiKey');
     if (openaiInput) openaiInput.value = settings.openaiApiKey || '';

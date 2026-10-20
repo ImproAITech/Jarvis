@@ -7,7 +7,8 @@ const STORAGE_KEYS = {
   SETTINGS: 'jarvis_user_settings',
   BUDGETS: 'jarvis_category_budgets',
   EXPENSE_CATEGORIES: 'jarvis_expense_categories',
-  INCOME_CATEGORIES: 'jarvis_income_categories'
+  INCOME_CATEGORIES: 'jarvis_income_categories',
+  RECURRING_EVENTS: 'jarvis_recurring_events'
 };
 
 // Default categories shared across the app
@@ -118,11 +119,11 @@ const getInitialChat = () => [
   }
 ];
 
-export const VALID_GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'];
+export const VALID_GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'];
 
 const getInitialSettings = () => ({
   apiKey: 'AQ.Ab8RN6I5y5JUhYnT-8JPoG0tUyWAOF2_gqTgoZehHrRlC63qFw',
-  geminiModel: 'gemini-2.5-flash',
+  geminiModel: 'gemini-3.8-flash',
   openaiApiKey: '',
   provider: 'gemini',
   currency: 'MXN',
@@ -211,6 +212,90 @@ class Store {
     return deleted;
   }
 
+  // --- RECURRING EVENTS (eventos programados mensuales) ---
+  getRecurringEvents() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEYS.RECURRING_EVENTS) || '[]');
+    } catch {
+      return [];
+    }
+  }
+
+  saveRecurringEvents(events) {
+    localStorage.setItem(STORAGE_KEYS.RECURRING_EVENTS, JSON.stringify(events));
+    this.notify('recurring_events', events);
+  }
+
+  /**
+   * Adds a new recurring monthly event.
+   * @param {object} evt
+   * @param {string} evt.title
+   * @param {number} evt.day_of_month  1-31
+   * @param {number} evt.start_hour   0-23
+   * @param {number} evt.start_minute 0-59
+   * @param {number} [evt.duration_minutes] default 60
+   * @param {string} [evt.description]
+   * @param {string} [evt.location]
+   * @param {string} [evt.color]  accent color key: 'cyan'|'purple'|'emerald'|'amber'
+   * @param {number} [evt.reminder_minutes]
+   */
+  addRecurringEvent(evt) {
+    const events = this.getRecurringEvents();
+    const settings = this.getSettings();
+    const defaultRem = settings.defaultReminderMinutes !== undefined ? parseInt(settings.defaultReminderMinutes, 10) : 15;
+    const newEvt = {
+      id: `rec-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      title: evt.title || 'Sin título',
+      recurrence_type: evt.recurrence_type === 'weekly_days' ? 'weekly_days' : 'monthly_day',
+      day_of_month: Math.max(1, Math.min(31, parseInt(evt.day_of_month, 10) || 1)),
+      days_of_week: Array.isArray(evt.days_of_week) && evt.days_of_week.length > 0
+        ? evt.days_of_week.map(d => parseInt(d, 10))
+        : [1],
+      start_hour: Math.max(0, Math.min(23, parseInt(evt.start_hour, 10) || 9)),
+      start_minute: Math.max(0, Math.min(59, parseInt(evt.start_minute, 10) || 0)),
+      duration_minutes: Math.max(5, parseInt(evt.duration_minutes, 10) || 60),
+      description: evt.description || '',
+      location: evt.location || '',
+      color: evt.color || 'cyan',
+      reminder_minutes: evt.reminder_minutes !== undefined && evt.reminder_minutes !== null
+        ? parseInt(evt.reminder_minutes, 10) : defaultRem,
+      created_at: new Date().toISOString()
+    };
+    events.push(newEvt);
+    events.sort((a, b) => {
+      if (a.recurrence_type !== b.recurrence_type) {
+        return a.recurrence_type === 'weekly_days' ? -1 : 1;
+      }
+      return (a.day_of_month || 0) - (b.day_of_month || 0) || a.start_hour - b.start_hour || a.start_minute - b.start_minute;
+    });
+    this.saveRecurringEvents(events);
+    return newEvt;
+  }
+
+  updateRecurringEvent(id, changes) {
+    const events = this.getRecurringEvents();
+    const idx = events.findIndex(e => e.id === id);
+    if (idx === -1) return null;
+    events[idx] = { ...events[idx], ...changes };
+    if (changes.recurrence_type) events[idx].recurrence_type = changes.recurrence_type;
+    if (changes.days_of_week) events[idx].days_of_week = changes.days_of_week;
+    events.sort((a, b) => {
+      if (a.recurrence_type !== b.recurrence_type) {
+        return a.recurrence_type === 'weekly_days' ? -1 : 1;
+      }
+      return (a.day_of_month || 0) - (b.day_of_month || 0) || a.start_hour - b.start_hour || a.start_minute - b.start_minute;
+    });
+    this.saveRecurringEvents(events);
+    return events[idx];
+  }
+
+  deleteRecurringEvent(id) {
+    const events = this.getRecurringEvents();
+    const deleted = events.find(e => e.id === id);
+    this.saveRecurringEvents(events.filter(e => e.id !== id));
+    return deleted;
+  }
+
   // --- FINANCES ---
   getTransactions() {
     try {
@@ -293,9 +378,9 @@ class Store {
       const merged = { ...defaults, ...stored };
       // Always use default key if stored key is empty
       if (!merged.apiKey) merged.apiKey = defaults.apiKey;
-      // Auto-migrate old/deprecated model names to gemini-2.5-flash
+      // Auto-migrate old/deprecated model names to gemini-3.8-flash
       if (!VALID_GEMINI_MODELS.includes(merged.geminiModel)) {
-        merged.geminiModel = 'gemini-2.5-flash';
+        merged.geminiModel = 'gemini-3.8-flash';
       }
       return merged;
     } catch {
@@ -442,6 +527,7 @@ class Store {
     localStorage.removeItem(STORAGE_KEYS.BUDGETS);
     localStorage.removeItem(STORAGE_KEYS.EXPENSE_CATEGORIES);
     localStorage.removeItem(STORAGE_KEYS.INCOME_CATEGORIES);
+    // Note: recurring events are NOT cleared on reset — they're permanent until manually deleted
     this.init();
     this.notify('reset', null);
   }

@@ -308,6 +308,71 @@ class NotificationManager {
         }
       }
     });
+
+    // Monitoreo de eventos programados (mensuales y por días de la semana)
+    try {
+      const recurring = store.getRecurringEvents();
+      const today = new Date();
+      const currentDay = today.getDate();
+      const currentDayOfWeek = today.getDay();
+      const currentMonth = today.getMonth();
+      const currentYear = today.getFullYear();
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+      recurring.forEach(evt => {
+        let isToday = false;
+        if (evt.recurrence_type === 'weekly_days') {
+          const days = Array.isArray(evt.days_of_week) ? evt.days_of_week : [];
+          isToday = days.includes(currentDayOfWeek);
+        } else {
+          const effDay = Math.min(evt.day_of_month || 1, daysInMonth);
+          isToday = (effDay === currentDay);
+        }
+
+        if (!isToday) return;
+
+        const eventDate = new Date(currentYear, currentMonth, currentDay, evt.start_hour, evt.start_minute, 0);
+        const startTime = eventDate.getTime();
+        const diffMinutes = Math.round((startTime - now) / 60000);
+
+        const remMin = evt.reminder_minutes !== undefined && evt.reminder_minutes !== null
+          ? parseInt(evt.reminder_minutes, 10)
+          : defaultRem;
+
+        const todayKey = `${currentYear}-${currentMonth + 1}-${currentDay}`;
+
+        if (remMin > 0) {
+          const keyAdvance = `rec_${evt.id}_${todayKey}_rem_${remMin}m`;
+          if (diffMinutes <= remMin && diffMinutes >= Math.max(1, remMin - 3) && !this.notifiedEvents.has(keyAdvance)) {
+            this.notifiedEvents.add(keyAdvance);
+            this.saveNotifiedEvents();
+
+            const label = this.formatReminderText(remMin);
+            this.sendNotification(`⏰ Evento programado en ${label}: ${evt.title}`, {
+              body: `Inicia a las ${eventDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}${evt.location ? ` en ${evt.location}` : ''}.`,
+              tag: keyAdvance,
+              requireInteraction: true
+            });
+          }
+        }
+
+        if ((notifyOnStart || remMin === 0) && remMin !== -1) {
+          const keyNow = `rec_${evt.id}_${todayKey}_now`;
+          if (diffMinutes >= 0 && diffMinutes <= 4 && !this.notifiedEvents.has(keyNow)) {
+            this.notifiedEvents.add(keyNow);
+            this.saveNotifiedEvents();
+
+            this.sendNotification(`🚨 ¡Comenzando ahora! ${evt.title}`, {
+              body: `Tu evento programado "${evt.title}" está por comenzar.${evt.location ? ` Ubicación: ${evt.location}` : ''}`,
+              tag: keyNow,
+              requireInteraction: true
+            });
+          }
+        }
+      });
+    } catch (e) {
+      console.warn('Error monitoreando eventos recurrentes:', e);
+    }
   }
 
   startMonitoring() {
