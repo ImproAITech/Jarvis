@@ -361,7 +361,7 @@ function parseLocalIntent(userInput) {
 }
 
 // Test Gemini API Key connectivity
-export async function testGeminiApiKey(apiKey, model = 'gemini-3.8-flash') {
+export async function testGeminiApiKey(apiKey, model = 'gemini-2.5-flash') {
   if (!apiKey || !apiKey.trim()) {
     throw new Error('Por favor ingresa tu API Key.');
   }
@@ -397,7 +397,7 @@ export async function testGeminiApiKey(apiKey, model = 'gemini-3.8-flash') {
 // Call Google Gemini API
 async function callGemini(userInput, apiKey) {
   const settings = store.getSettings();
-  const model = settings.geminiModel || 'gemini-3.8-flash';
+  const model = settings.geminiModel || 'gemini-2.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
 
   // Keep last 6 messages (3 conversation turns) to save tokens and quota.

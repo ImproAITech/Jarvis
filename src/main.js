@@ -271,10 +271,10 @@ class JarvisApp {
               <div id="geminiModelGroup">
                 <label class="field-label">Modelo Gemini</label>
                 <select class="custom-select" id="settingGeminiModel">
-                  <option value="gemini-3.8-flash">Gemini 3.8 Flash (Recomendado)</option>
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recomendado - Rápido y Preciso)</option>
+                  <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                  <option value="gemini-1.5-flash">Gemini 1.5 Flash (Estable)</option>
                   <option value="gemini-2.5-pro">Gemini 2.5 Pro (Máximo razonamiento)</option>
-                  <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite (Ultra rápido)</option>
                 </select>
               </div>
 
@@ -1119,7 +1119,7 @@ class JarvisApp {
 
     btnTestGeminiKey?.addEventListener('click', async () => {
       const key = geminiKeyInput.value.trim();
-      const model = document.getElementById('settingGeminiModel')?.value || 'gemini-3.8-flash';
+      const model = document.getElementById('settingGeminiModel')?.value || 'gemini-2.5-flash';
 
       if (!key) {
         if (geminiKeyStatus) geminiKeyStatus.innerHTML = '<span style="color: var(--accent-rose);">⚠️ Pega tu API Key primero.</span>';
@@ -1173,7 +1173,7 @@ class JarvisApp {
     const btnSaveGeminiKeyNow = document.getElementById('btnSaveGeminiKeyNow');
     btnSaveGeminiKeyNow?.addEventListener('click', () => {
       const apiKey = document.getElementById('settingGeminiKey')?.value.trim();
-      const model = document.getElementById('settingGeminiModel')?.value || 'gemini-3.8-flash';
+      const model = document.getElementById('settingGeminiModel')?.value || 'gemini-2.5-flash';
       if (!apiKey) {
         const geminiKeyStatus = document.getElementById('geminiKeyStatus');
         if (geminiKeyStatus) geminiKeyStatus.innerHTML = '<span style="color: var(--accent-rose);">⚠️ Escribe o pega tu API Key primero.</span>';
@@ -2476,7 +2476,7 @@ class JarvisApp {
     if (geminiInput) geminiInput.value = settings.apiKey || '';
 
     const modelSelect = document.getElementById('settingGeminiModel');
-    if (modelSelect) modelSelect.value = settings.geminiModel || 'gemini-3.8-flash';
+    if (modelSelect) modelSelect.value = settings.geminiModel || 'gemini-2.5-flash';
 
     const openaiInput = document.getElementById('settingOpenaiKey');
     if (openaiInput) openaiInput.value = settings.openaiApiKey || '';

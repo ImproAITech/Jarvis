@@ -121,51 +121,75 @@ class VoiceEngine {
     }
   }
 
-  listen({ onStart, onResult, onError, onEnd } = {}) {
-    if (!this.recognition) {
+  async listen({ onStart, onResult, onError, onEnd } = {}) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
       if (onError) onError(new Error('Dictado por voz no disponible en este dispositivo.'));
       return;
     }
 
     if (this.isListening) {
-      this.recognition.stop();
+      this.stopListening();
       return;
     }
 
     // Stop speaking while listening to prevent self-triggering
     this.stopSpeaking();
 
-    this.recognition.onstart = () => {
-      this.isListening = true;
-      if (onStart) onStart();
-    };
-
-    this.recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      if (onResult) onResult(transcript);
-    };
-
-    this.recognition.onerror = (event) => {
-      this.isListening = false;
-      if (onError) onError(event);
-    };
-
-    this.recognition.onend = () => {
-      this.isListening = false;
-      if (onEnd) onEnd();
-    };
+    // On iOS / Safari: explicitly trigger microphone permission prompt
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop());
+      } catch (micErr) {
+        if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
+          if (onError) onError({ error: 'not-allowed' });
+          return;
+        }
+      }
+    }
 
     try {
+      this.recognition = new SpeechRecognition();
+      this.recognition.continuous = false;
+      this.recognition.interimResults = false;
+      this.recognition.lang = 'es-MX';
+
+      this.recognition.onstart = () => {
+        this.isListening = true;
+        if (onStart) onStart();
+      };
+
+      this.recognition.onresult = (event) => {
+        const transcript = event.results?.[0]?.[0]?.transcript || '';
+        if (onResult) onResult(transcript);
+      };
+
+      this.recognition.onerror = (event) => {
+        this.isListening = false;
+        if (onError) onError(event);
+      };
+
+      this.recognition.onend = () => {
+        this.isListening = false;
+        if (onEnd) onEnd();
+      };
+
       this.recognition.start();
     } catch (err) {
       console.warn('Error iniciando reconocimiento:', err);
       this.isListening = false;
+      if (onError) onError(err);
     }
   }
 
   stopListening() {
     if (this.recognition && this.isListening) {
-      this.recognition.stop();
+      try {
+        this.recognition.stop();
+      } catch {
+        // ignore
+      }
       this.isListening = false;
     }
   }

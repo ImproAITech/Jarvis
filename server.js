@@ -51,6 +51,13 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'jarvis-push-api' });
 });
 
+// App configuration (provides server-configured Gemini API key if present)
+app.get('/api/config', (_req, res) => {
+  res.json({
+    geminiApiKey: process.env.GEMINI_API_KEY || '',
+  });
+});
+
 // ── Static Frontend ───────────────────────────────────────────────────────────
 const distPath = join(__dirname, 'dist');
 app.use(express.static(distPath));

@@ -119,11 +119,11 @@ const getInitialChat = () => [
   }
 ];
 
-export const VALID_GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'];
+export const VALID_GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-pro'];
 
 const getInitialSettings = () => ({
   apiKey: '',
-  geminiModel: 'gemini-3.8-flash',
+  geminiModel: 'gemini-2.5-flash',
   openaiApiKey: '',
   provider: 'gemini',
   currency: 'MXN',
@@ -151,6 +151,23 @@ class Store {
     }
     if (!localStorage.getItem(STORAGE_KEYS.SETTINGS)) {
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(getInitialSettings()));
+    }
+    this.loadServerConfig();
+  }
+
+  async loadServerConfig() {
+    try {
+      const res = await fetch('/api/config');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.geminiApiKey) {
+        const current = this.getSettings();
+        if (!current.apiKey) {
+          this.updateSettings({ apiKey: data.geminiApiKey });
+        }
+      }
+    } catch {
+      // offline / static fallback
     }
   }
 
@@ -378,9 +395,9 @@ class Store {
       const merged = { ...defaults, ...stored };
       // Always use default key if stored key is empty
       if (!merged.apiKey) merged.apiKey = defaults.apiKey;
-      // Auto-migrate old/deprecated model names to gemini-3.8-flash
-      if (!VALID_GEMINI_MODELS.includes(merged.geminiModel)) {
-        merged.geminiModel = 'gemini-3.8-flash';
+      // Auto-migrate old/deprecated or non-existent model names to gemini-2.5-flash
+      if (!VALID_GEMINI_MODELS.includes(merged.geminiModel) || merged.geminiModel === 'gemini-3.8-flash') {
+        merged.geminiModel = 'gemini-2.5-flash';
       }
       return merged;
     } catch {

@@ -50,6 +50,14 @@ class NotificationManager {
 
   // ── Basic checks ────────────────────────────────────────────────────────────
 
+  isIos() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  isStandalone() {
+    return ('standalone' in navigator && navigator.standalone) || window.matchMedia('(display-mode: standalone)').matches;
+  }
+
   isSupported() {
     return 'Notification' in window;
   }
@@ -62,7 +70,12 @@ class NotificationManager {
   // ── Permission + Web Push subscription ─────────────────────────────────────
 
   async requestPermission() {
-    if (!this.isSupported()) return false;
+    if (!this.isSupported()) {
+      if (this.isIos() && !this.isStandalone()) {
+        alert('📲 Para activar notificaciones en iPhone:\n\n1. Toca el botón Compartir (cuadrado con flecha ⬆️) en Safari.\n2. Toca "Agregar a pantalla de inicio".\n3. Abre Jarvis desde el icono en tu pantalla de inicio y vuelve a presionar "Activar alertas".');
+      }
+      return false;
+    }
     try {
       const permission = await Notification.requestPermission();
       const granted = permission === 'granted';
