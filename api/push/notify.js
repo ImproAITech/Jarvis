@@ -6,12 +6,11 @@ import webpush from 'web-push';
 import { Redis } from '@upstash/redis';
 import { Receiver } from '@upstash/qstash';
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
-});
-
 export default async function handler(req, res) {
+  const redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+  });
   // Initialize VAPID inside handler so missing env vars don't crash at import
   try {
     webpush.setVapidDetails(

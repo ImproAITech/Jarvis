@@ -4,15 +4,21 @@
 
 import { Client as QStashClient } from '@upstash/qstash';
 
-const qstash = new QStashClient({
-  token: process.env.QSTASH_TOKEN,
-  baseUrl: process.env.QSTASH_URL || 'https://qstash-us-east-1.upstash.io',
-});
+function getQStashClient() {
+  const token = process.env.QSTASH_TOKEN;
+  const baseUrl = process.env.QSTASH_URL || undefined;
+  return new QStashClient({
+    token,
+    ...(baseUrl ? { baseUrl } : {}),
+  });
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
+
+  const qstash = getQStashClient();
 
   try {
     const data = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
