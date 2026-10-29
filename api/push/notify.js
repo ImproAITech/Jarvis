@@ -11,13 +11,19 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-webpush.setVapidDetails(
-  `mailto:${process.env.VAPID_EMAIL || 'jarvis@example.com'}`,
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
-
 export default async function handler(req, res) {
+  // Initialize VAPID inside handler so missing env vars don't crash at import
+  try {
+    webpush.setVapidDetails(
+      `mailto:${process.env.VAPID_EMAIL || 'jarvis@example.com'}`,
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    );
+  } catch (vapidErr) {
+    console.error('[notify] VAPID keys not configured:', vapidErr.message);
+    return res.status(500).json({ error: 'VAPID keys not configured' });
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
