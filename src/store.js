@@ -122,7 +122,7 @@ const getInitialChat = () => [
 export const VALID_GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'];
 
 const getInitialSettings = () => ({
-  apiKey: 'AQ.Ab8RN6I5y5JUhYnT-8JPoG0tUyWAOF2_gqTgoZehHrRlC63qFw',
+  apiKey: '',
   geminiModel: 'gemini-3.8-flash',
   openaiApiKey: '',
   provider: 'gemini',
